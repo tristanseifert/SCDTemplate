@@ -22,7 +22,7 @@ Each Main CPU module has a header that specifies it’s size, among some other t
 		dc.b	"MAIN"								; Header ID
 		dc.w	(EntryPoint-Header), 0				; Entry point, reserved
 
-EntryPoint: 										; Your code begins here
+	EntryPoint: 									; Your code begins here
 
 This header simply indicates to the module loader that you wish to load the code to Word RAM and execute it there as well. In case Word RAM is required for data exchange between the Sub CPU and Main CPU (scaling, FMV, etc) you can obviously not run code from there - the Main CPU will crash when the memory it was executing from is just pulled out under it’s balls. Therefore, the module loader also supports copying to Main CPU RAM and then running from there. The Main CPU RAM has a maximum supported size of around 62 KB of program code - this is why you may wish to first load something to Word RAM that, for example, loads your art to the VDP and then a program in Main CPU RAM to actually perform the functions required. Code can start at around $FF0400 in Main CPU RAM, and must end before $FFFD00. To use this function, the following header is used:
 
@@ -39,7 +39,7 @@ This header simply indicates to the module loader that you wish to load the code
 
 	even
 
-	EndOfModule:										; End of the module
+	EndOfModule:									; End of the module
 
 The offset is the location your code is loaded to plus $FF0000. The limitations stated above apply. You may wish to add an org statement before your header to the offset plus $FF0000 so absolute lea, jsr, and friends work.
 
