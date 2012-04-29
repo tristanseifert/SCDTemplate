@@ -1,14 +1,14 @@
 This is a very basic template that will allow you to run arbitrary programs on the Sega CD. Included with it are a few files:
 
-*   /bin - contains some tools related to Sega CD work written by Bgvanbur
-*   /common - contains some code every module should make use of, such as a module loader, etc.
-*   /menu - a simple demonstration that displays “Hello World” on the screen. Included is the Sonic CD Sound Test font I ripped.
+*   **/bin** - contains some tools related to Sega CD work written by Bgvanbur
+*   **/common** - contains some code every module should make use of, such as a module loader, etc.
+*   **/menu** - a simple demonstration that displays “Hello World” on the screen. Included is the Sonic CD Sound Test font I ripped.
 
 There’s also some files that float around that don’t make sense at first sight. They are:
 
-*   IP.ASM - the initial program the BIOS loads from the disc and runs on the Main CPU.
-*   SP.ASM - the initial program the BIOS loads from the disc and runs on the Sub CPU.
-*   cdbios.inc - Contains macros for calling BIOS functions from the Sub CPU
+*   **IP.ASM** - the initial program the BIOS loads from the disc and runs on the Main CPU.
+*   **SP.ASM** - the initial program the BIOS loads from the disc and runs on the Sub CPU.
+*   **cdbios.inc** - Contains macros for calling BIOS functions from the Sub CPU
 
 Any other .BIN files you may observe there are most probably assembled modules you wrote, or data. The .LST files map an address in a .BIN to an instruction in it. This comes in handy when debugging - note that the build scripts automagically generate these.
 
