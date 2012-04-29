@@ -1,0 +1,84 @@
+#!/usr/bin/perl
+###############################################################################
+# Copyright (c) 2011 by bgvanbur
+#
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 2 of the License, or (at your
+# option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+###############################################################################
+
+use strict;
+use warnings;
+
+# asmx-bgv only parameters: -pu1 -pa0 -u -n 
+my $cmd = '/Applications/Wine.app/Contents/MacOS/startwine bin/asm68k /o op+ /o os+ /o ow+ /o oz+ /o oaq+ /o osq+ /o omq+ /p /o ae-';
+
+my $verbosity = 2;
+
+my @args;
+foreach my $arg (@ARGV) {
+    if ( $arg =~ m/^-v=(\d+)$/i ) {
+	$verbosity = $1;
+    } else {
+	push @args, $arg;
+    }
+}
+
+if ( $#args == 1 ) {
+    my $asm = $args[0];
+    my $bin = $args[1];
+    $cmd = " /Applications/Wine.app/Contents/MacOS/startwine bin/asm68k /o op+ /o os+ /o ow+ /o oz+ /o oaq+ /o osq+ /o omq+ /p /o ae- $asm, $bin";
+} elsif ( $#args == 2 ) {
+    my $asm = $args[0];
+    my $bin = $args[1];
+    my $lst = $args[2];
+    $cmd = "/Applications/Wine.app/Contents/MacOS/startwine bin/asm68k /o op+ /o os+ /o ow+ /o oz+ /o oaq+ /o osq+ /o omq+ /p /o ae- $asm, $bin, , $lst";
+} else {
+    &Help();
+}
+
+# only need to filter STDERR if low verbosity
+if ( $verbosity < 2 ) {
+    # TODO not sure how portable 2>&1 is though...
+    # TODO can be avoided by not setting verbosity
+    $cmd .= ' 2>&1';
+}
+
+if ( ! open( CMD, "$cmd |" ) ) {
+    die "scdasm could not run command: $cmd\n";
+}
+
+while ( my $line = <CMD> ) {
+    # remove empty lines
+    # remove Pass 1 and Pass 2 lines
+    # remove 0 Total Error(s) lines
+    if ( $verbosity >= 2 ||
+	 $line !~ m/^(\s*|\s*Pass\s*[12]\s*|\s*0+\s*Total\s*Error\(s\)\s*)$/ ) {
+	print $line;
+    }
+}
+
+close CMD;
+
+sub Help {
+    die '
+scdasm [options] <asmfile> <binfile> [lstfile]
+
+[description]
+  wrapper script for assembling 68k code
+
+[options]
+  -v=<#>              specify verbosity
+
+';
+}

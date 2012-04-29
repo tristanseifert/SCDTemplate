@@ -1,0 +1,161 @@
+K 25
+svn:wc:ra_dav:version-url
+V 28
+/p/scdtools/code/!svn/ver/31
+END
+scdisofilefromoffset
+K 25
+svn:wc:ra_dav:version-url
+V 48
+/p/scdtools/code/!svn/ver/3/scdisofilefromoffset
+END
+scdcinepakencode
+K 25
+svn:wc:ra_dav:version-url
+V 44
+/p/scdtools/code/!svn/ver/7/scdcinepakencode
+END
+scdwrite
+K 25
+svn:wc:ra_dav:version-url
+V 36
+/p/scdtools/code/!svn/ver/3/scdwrite
+END
+scdmake_us_prop.bin
+K 25
+svn:wc:ra_dav:version-url
+V 47
+/p/scdtools/code/!svn/ver/1/scdmake_us_prop.bin
+END
+scdlittle2bigword
+K 25
+svn:wc:ra_dav:version-url
+V 45
+/p/scdtools/code/!svn/ver/3/scdlittle2bigword
+END
+scdmake_eu_pad.bin
+K 25
+svn:wc:ra_dav:version-url
+V 46
+/p/scdtools/code/!svn/ver/1/scdmake_eu_pad.bin
+END
+scdmake_jp_pad.bin
+K 25
+svn:wc:ra_dav:version-url
+V 46
+/p/scdtools/code/!svn/ver/1/scdmake_jp_pad.bin
+END
+scdchecksum
+K 25
+svn:wc:ra_dav:version-url
+V 40
+/p/scdtools/code/!svn/ver/19/scdchecksum
+END
+scdcinepakencodeframe
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/p/scdtools/code/!svn/ver/3/scdcinepakencodeframe
+END
+scdimgvdppalette
+K 25
+svn:wc:ra_dav:version-url
+V 45
+/p/scdtools/code/!svn/ver/29/scdimgvdppalette
+END
+scdasmall
+K 25
+svn:wc:ra_dav:version-url
+V 38
+/p/scdtools/code/!svn/ver/26/scdasmall
+END
+scdupdatebinfile
+K 25
+svn:wc:ra_dav:version-url
+V 45
+/p/scdtools/code/!svn/ver/17/scdupdatebinfile
+END
+scdimg2tile
+K 25
+svn:wc:ra_dav:version-url
+V 40
+/p/scdtools/code/!svn/ver/30/scdimg2tile
+END
+scdtile2img
+K 25
+svn:wc:ra_dav:version-url
+V 40
+/p/scdtools/code/!svn/ver/23/scdtile2img
+END
+scdmake_eu_prop.bin
+K 25
+svn:wc:ra_dav:version-url
+V 47
+/p/scdtools/code/!svn/ver/1/scdmake_eu_prop.bin
+END
+scdmake
+K 25
+svn:wc:ra_dav:version-url
+V 36
+/p/scdtools/code/!svn/ver/31/scdmake
+END
+scdmake_jp_prop.bin
+K 25
+svn:wc:ra_dav:version-url
+V 47
+/p/scdtools/code/!svn/ver/1/scdmake_jp_prop.bin
+END
+scdpalettemutate
+K 25
+svn:wc:ra_dav:version-url
+V 45
+/p/scdtools/code/!svn/ver/23/scdpalettemutate
+END
+scdget
+K 25
+svn:wc:ra_dav:version-url
+V 34
+/p/scdtools/code/!svn/ver/3/scdget
+END
+scdmake_us_pad.bin
+K 25
+svn:wc:ra_dav:version-url
+V 46
+/p/scdtools/code/!svn/ver/1/scdmake_us_pad.bin
+END
+scdwav2pcm
+K 25
+svn:wc:ra_dav:version-url
+V 38
+/p/scdtools/code/!svn/ver/7/scdwav2pcm
+END
+scdasm
+K 25
+svn:wc:ra_dav:version-url
+V 34
+/p/scdtools/code/!svn/ver/3/scdasm
+END
+README.TXT
+K 25
+svn:wc:ra_dav:version-url
+V 39
+/p/scdtools/code/!svn/ver/14/README.TXT
+END
+scdmoviedecode
+K 25
+svn:wc:ra_dav:version-url
+V 42
+/p/scdtools/code/!svn/ver/6/scdmoviedecode
+END
+scdhex
+K 25
+svn:wc:ra_dav:version-url
+V 34
+/p/scdtools/code/!svn/ver/3/scdhex
+END
+scd68kdcleanup
+K 25
+svn:wc:ra_dav:version-url
+V 42
+/p/scdtools/code/!svn/ver/3/scd68kdcleanup
+END

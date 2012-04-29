@@ -1,0 +1,59 @@
+#!/usr/bin/perl
+###############################################################################
+# Copyright (c) 2011 by bgvanbur
+#
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 2 of the License, or (at your
+# option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+###############################################################################
+
+use strict;
+use warnings;
+
+if ( $#ARGV < 0 ) {
+    &Help();
+}
+
+# TODO a more generic checksummer?
+
+foreach my $file (@ARGV) {
+    open( BIN, "<$file" ) or die "Cannot read $file\n";
+    binmode BIN;
+    my $size = -s $file;
+    my $buffer = '';
+    if ( ! read(BIN,$buffer,$size) ) {
+	die "Cannot read $file\n";
+    }
+    close BIN;
+    my $sum = 0x0000;
+    for ( my $i = 2; $i < $size-1; $i += 2 ) {
+	$sum += unpack("n",substr($buffer,$i,2));
+    }
+    substr($buffer,0,2) = pack("n",$sum);
+    open( BIN, ">$file" ) or die "Cannot write $file\n";
+    binmode BIN;
+    print BIN $buffer;
+    close BIN;
+}
+
+sub Help {
+    die '
+scdchecksum <files>
+
+[description]
+  Computes a 16 bit checksum on all the 16 bit pairs in the file except the
+  first 16 bit pair.  It replaces the first 16 bit pair with the computed
+  checksum.  Was originally written for error handling on Sega CD file reading.
+
+';
+}

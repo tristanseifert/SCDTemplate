@@ -1,0 +1,10 @@
+Palette File: pal.bin
+Mapping File: fg_map.bin
+Art File: art.bin
+Mapping Compression: None
+Art Compression: None
+Palette Offset: 0x0
+Palette Length: 0x80
+x-Size: 40
+y-Size: 32
+Tile Offset: 0x00
