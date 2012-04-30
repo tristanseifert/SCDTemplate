@@ -55,7 +55,6 @@ SPMain:
 MainLoop:
 		move.b	#'D', $FF800F						; Clear busy flag.
 		nop
-		nop
 		
 		cmp.b	#0, $FF800E							; Do we have a pending command?
 		beq.s	MainLoop							; If not, keep checking.
@@ -73,8 +72,8 @@ MainLoop:
 		beq.w	CDDAPause							; If so, branch.
 		cmp.b	#4, d0								; Are we executing 'CDDAResume?'
 		beq.w	CDDAResume							; If so, branch.
-		cmp.b	#5, d0								; Are we executing 'PlayPCMStreamed?'
-		beq.w	PlayPCMStreamed						; If so, branch.
+		cmp.b	#5, d0								; Are we executing 'PlayPCM?'
+		beq.w	PlayPCM								; If so, branch.
 
 		bra.s	MainLoop							; Keep looping.
 		
@@ -166,9 +165,73 @@ CDDAResume:
 		
 ; ===============================================================================
 
-PlayPCMStreamed:
-		; FD reg should be 0x056B for test.pcm
-		bra.w	ReturnToMain						; Return to main loop.
+; Plays a simple drum loop.
+; The FD value for the samples is all 0x03EF.
+PlayPCM:
+		moveq	#0, d0								; Clear d0.	
+		move.b	#$FF, $FF0011						; Disable all channels.
+		bsr.w	PCMWait								; Wait for PCM chip. 
+		move.b	#$80, $FF000F						; Enable sounding, lowest bank of wave RAM
+		bsr.w	PCMWait								; Wait for PCM chip.
+
+		move.w	#$FFF, d0							; First 4 KB of Piano voice
+		lea		Sample_Piano(pc), a1				; Piano voice to a1.
+		lea		$FF2001, a2							; PCM Wave RAM to a2.
+		
+@loop1:
+		move.b	(a1)+, (a2)							; Write a byte to Wave RAM.
+		addq.l	#2, a2								; Add 2 to the offset in Wave RAM.
+		dbf		d0, @loop1							; Loop until all is written.
+		
+		move.b	#$81, $FF000F						; Enable sounding, second bank of wave RAM
+		bsr.w	PCMWait								; Wait for PCM chip.
+		
+		lea		$FF2001, a2							; PCM Wave RAM to a2.
+		move.w	#$C5C, d0							; Second 4 KB of Sega Scream
+		
+@loop2:
+		move.b	(a1)+, (a2)							; Write a byte to Wave RAM.
+		addq.l	#2, a2								; Add 2 to the offset in Wave RAM.
+		dbf		d0, @loop2							; Loop until all is written.
+		
+		lea		$FF0000, a0							; Load PCM sound source to a0.
+		
+		move.b	#$C0, $F(a0)						; Enable sounding, Configure Ch1
+		bsr.s	PCMWait								; Wait for PCM chip.
+		
+		move.b	#$00, $A(a0)						; Set LSH to 0
+		bsr.s	PCMWait								; Wait for PCM chip.
+		move.b	#$10, $9(a0)						; Set LSL to 0
+		bsr.s	PCMWait								; Wait for PCM chip.
+		move.b	#$03, $7(a0)						; Set FDH to $03
+		bsr.s	PCMWait								; Wait for PCM chip.
+		move.b	#$EF, $5(a0)						; Set FDL to $EF
+		bsr.s	PCMWait								; Wait for PCM chip.
+		move.b	#$FF, $3(a0)						; Center pan for L and R
+		bsr.s	PCMWait								; Wait for PCM chip.
+		move.b	#$FF, $1(a0)						; Set envelope to $E0
+		bsr.s	PCMWait								; Wait for PCM chip.
+		
+		move.b	#$FE, $11(a0)						; Enable channel 1
+		bsr.s	PCMWait								; Wait for PCM chip.
+		move.b	#$00, $C(a0)						; Set start address to $0000
+		bsr.s	PCMWait								; Wait for PCM chip.
+		move.b	#$C0, $F(a0)						; Enable sounding for channel 1.
+		bsr.s	PCMWait								; Wait for PCM chip.
+	
+		bra.w	ReturnToMain						; Jump back to main loop.
+	
+PCMWait:
+		moveq  #$7F, d0								; Loop 127 times times.
+
+@PCMWaitLoop:
+		nop
+		nop
+		nop
+		nop
+		nop
+		dbf		d0, @PCMWaitLoop						; Loop.
+	
 		
 ; ===============================================================================
 
@@ -237,6 +300,21 @@ Packet:
 		
 ExtraJunk:
 		dc.b	0
+		even
+		
+Sample_Drum1:
+		incbin	"PCM/drum1.pcm"
+		dc.b	$FF, $FF, $FF, $FF
+		even
+		
+Sample_Drum2:
+		incbin	"PCM/drum2.pcm"
+		dc.b	$FF, $FF, $FF, $FF
+		even
+		
+Sample_Piano:
+		incbin	"PCM/piano.pcm"
+		dc.b	$FF, $FF, $FF, $FF
 		even
 		
 EndSubCPU:

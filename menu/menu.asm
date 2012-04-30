@@ -66,22 +66,7 @@ EntryPoint:
 		moveq	#0, d0								; Offset is 0
 		bsr.w	Load_Palette						; Display palette.
 		
-		move.b	#5, $A1200E							; Stream PCM from the disc (blocks)
-	
-		moveq	#$7F, d0							; Loop 8 times = 40 nops
-	
-@loop:
-		nop
-		nop
-		nop
-		nop
-		nop
-		dbf		d0, @loop							; Keep looping.
-		
-@waitForSubCPU3:
-		nop
-		cmp.b	#'D', $A1200F						; Wait for Sub CPU to service our command
-		bne.s	@waitForSubCPU3						; Keep looping until it finishes
+		move.b	#5, $A1200E							; Play a PCM sample
 		
 MainLoop:
 		stop	#$2500								; Wait for VBlank
