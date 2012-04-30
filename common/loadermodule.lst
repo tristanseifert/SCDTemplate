@@ -1,0 +1,84 @@
+00000000                            		org	$FF0200									; Run out of RAM
+00FF0200                            		; The ID of the module to load is expected in $FF01FE
+00FF0200                            		
+00FF0200                            EntryPoint:
+00FF0200 43FA 0000                  		lea		VBlank(pc), a1						; Load Address for VBL routine
+00FF0204 4EB8 0368                  		jsr     $368								; Make appropriate change in Interrupt Jump table
+00FF0208                            
+00FF0208                            
+00FF0208                            ;		move.w	#$8144, $C00004						; Turn off VINTs
+00FF0208 0039 0002 00A1 2003        		ori.b	#2, $A12003							; Give SUB CPU control of WordRAM
+00FF0210                            		
+00FF0210 33FA FFEC 00A1 2010        		move.w	$FF01FE, $A12010					; Load Menu screen.
+00FF0218 13FC 0001 00A1 200E        		move.b	#1, $A1200E							; Load a program from the disc.
+00FF0220                            	
+00FF0220 707F                       		moveq	#$7F, d0							; Loop 8 times = 40 nops
+00FF0222                            	
+00FF0222                            @loop:
+00FF0222 4E71                       		nop
+00FF0224 4E71                       		nop
+00FF0226 4E71                       		nop
+00FF0228 4E71                       		nop
+00FF022A 4E71                       		nop
+00FF022C 4E71                       		nop
+00FF022E 4E71                       		nop
+00FF0230 4E71                       		nop
+00FF0232 4E71                       		nop
+00FF0234 4E71                       		nop
+00FF0236 4E71                       		nop
+00FF0238 4E71                       		nop
+00FF023A 4E71                       		nop
+00FF023C 4E71                       		nop
+00FF023E 4E71                       		nop
+00FF0240 51C8 FFE0                  		dbf		d0, @loop							; Keep looping.
+00FF0244                            		
+00FF0244                            @waitForSubCPU3:
+00FF0244 4E71                       		nop
+00FF0246 0C39 0044 00A1 200F        		cmp.b	#'D', $A1200F						; Wait for Sub CPU to service our command
+00FF024E 66F4                       		bne.s	@waitForSubCPU3						; Keep looping until it finishes
+00FF0250                            		
+00FF0250 13FC 0000 00A1 200E        		move.b	#0, $A1200E							; Clear program.
+00FF0258 33FC 0000 00A1 2010        		move.w	#0, $A12010							; Clear parameter.
+00FF0260                            		
+00FF0260 41F9 0020 0000             		lea		$200000, a0							; Load Word RAM address to a0.
+00FF0266                            		
+00FF0266 0C90 4D41 494E             		cmp.l	#"MAIN", (a0)						; Is the loaded file a Main CPU executable?
+00FF026C 6600                       		bne.s	FileInvalid
+00FF026E                            		
+00FF026E 0C68 0000 0006             		cmp.w	#0, 6(a0)							; Check if we've got a RAM offset
+00FF0274 6700 0000                  		beq.w	@runFromWordRAM						; If not, branch.
+00FF0278                            		
+00FF0278 7000                       		moveq	#0, d0								; Clear d0.
+00FF027A 7200                       		moveq	#0, d1								; Clear d1.
+00FF027C 2C7A FD82                  		move.l	$FF0000, a6							; Start of RAM to a6
+00FF0280 3028 0006                  		move.w	6(a0), d0							; Get our RAM offset to d0
+00FF0284 0880 0000                  		bclr	#0, d0								; Clear LSB to even it out.
+00FF0288 DDC0                       		add.l	d0, a6								; Add to the pointer.
+00FF028A 4BF9 0020 000A             		lea		$20000A, a5							; Word RAM offset to a5.
+00FF0290 3228 0008                  		move.w	8(a0), d1							; Get the length to copy.
+00FF0294 5341                       		subq.w	#1, d1								; Subtract 1 to offset loop
+00FF0296                            
+00FF0296                            @copyToMainRAM:
+00FF0296 1CDD                       		move.b	(a5)+, (a6)+						; Copy one byte of the data.
+00FF0298 51C9 FFFC                  		dbf		d1, @copyToMainRAM					; Loop until it's all copied.
+00FF029C                            		
+00FF029C 2C7A FD62                  		move.l	$FF0000, a6							; Start of RAM to a6
+00FF02A0 3028 0006                  		move.w	6(a0), d0							; Get our RAM offset to d0
+00FF02A4 0880 0000                  		bclr	#0, d0								; Clear LSB to even it out.
+00FF02A8 DDC0                       		add.l	d0, a6								; Add to the pointer.
+00FF02AA                            		
+00FF02AA 4ED6                       		jmp		(a6)								; Jump to the code.
+00FF02AC                            
+00FF02AC                            @runFromWordRAM:
+00FF02AC 4DF9 0020 0000             		lea		$200000, a6							; Load Word RAM address to a0.
+00FF02B2 7000                       		moveq	#0, d0								; Clear d0.
+00FF02B4 302E 0004                  		move.w	4(a6), d0							; Copy offset of entry point to d0.
+00FF02B8 DDC0                       		add.l	d0, a6								; Add to pointer.
+00FF02BA                            
+00FF02BA 4EF9 0020 0008             		jmp		$200008								; Jump to program.
+00FF02C0                            	
+00FF02C0                            FileInvalid:
+00FF02C0 6000 FFFE                  		bra.w	FileInvalid							; INFINITE LOOP!1!!!!!!
+00FF02C4                            		
+00FF02C4                            VBlank:
+00FF02C4 4E73                       		rte
