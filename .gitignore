@@ -1,6 +1,6 @@
-DEMO1_US.ISO
-DEMO1_EU.ISO
-DEMO1_JP.ISO
+SCDDEMO_US.ISO
+SCDDEMO_EU.ISO
+SCDDEMO_JP.ISO
 MENU.BIN
 IP.BIN
 IP.LST
@@ -9,3 +9,5 @@ SP.BIN
 SP.LST
 SCDMAKE.INC
 menu/menu.lst
+common/loadermodule.lst
+common/loadermodule.bin
