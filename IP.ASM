@@ -324,8 +324,8 @@ ASCII_NotValid:
 		even	
 		
 		
-Font:	incbin	"modules/Font.bin"
+Font:	incbin	"common/Font.bin"
 		even
 		
-Palette:	incbin	"modules/UI.pal"
+Palette:	incbin	"common/UI.pal"
 		even

@@ -73,6 +73,8 @@ MainLoop:
 		beq.w	CDDAPause							; If so, branch.
 		cmp.b	#4, d0								; Are we executing 'CDDAResume?'
 		beq.w	CDDAResume							; If so, branch.
+		cmp.b	#5, d0								; Are we executing 'PlayPCMStreamed?'
+		beq.w	PlayPCMStreamed						; If so, branch.
 
 		bra.s	MainLoop							; Keep looping.
 		
@@ -161,6 +163,14 @@ CDDAPause:
 CDDAResume:
 		BIOS_MSCPAUSEOFF							; Call into BIOS
 		bra.w	ReturnToMain						; Return to main loop.
+		
+; ===============================================================================
+
+PlayPCMStreamed:
+		; FD reg should be 0x056B for test.pcm
+		bra.w	ReturnToMain						; Return to main loop.
+		
+; ===============================================================================
 
 ; Dummy function
 ReturnToMain:
