@@ -11,3 +11,4 @@ SCDMAKE.INC
 menu/menu.lst
 common/loadermodule.lst
 common/loadermodule.bin
+.DS_Store

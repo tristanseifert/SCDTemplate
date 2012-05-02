@@ -317,5 +317,7 @@ Sample_Piano:
 		dc.b	$FF, $FF, $FF, $FF
 		even
 		
+		include	"PCM/PCM.asm"
+		
 EndSubCPU:
 		even
