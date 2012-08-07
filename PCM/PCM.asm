@@ -222,3 +222,24 @@ ReadCD_Packet:
 ReadCD_ExtraJunk:
 		dc.b	0
 		even
+
+;---------------------------------------------------------------------------------------------------
+; DriverMainLoop
+;
+; The driver's main loop
+;---------------------------------------------------------------------------------------------------
+DriverMainLoop:
+
+		rts
+
+
+;---------------------------------------------------------------------------------------------------
+; LoopRoutines
+;
+; A table pointing to routines that are called by the driver when it encouters a loop or jump flag
+; with an index greater than $04. Index $05 is the first entry in this table. Return 0 in d0 to not
+; perform the loop/jump, or $FF to perform the loop/jump.
+;---------------------------------------------------------------------------------------------------
+
+LoopRoutines:
+		dc.l	
