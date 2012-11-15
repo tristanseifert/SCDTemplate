@@ -67,6 +67,12 @@ EntryPoint:
 		bsr.w	Load_Palette						; Display palette.
 		
 		move.b	#5, $A1200E							; Play a PCM sample
+
+@waitSubCPU:
+		cmp.b	#'B', $A1200F						; Is it still processing?
+		beq.s	@waitSubCPU							; If so, branch.
+		
+		move.b	#0, $A1200E							; Clear the thingie.
 		
 MainLoop:
 		stop	#$2500								; Wait for VBlank

@@ -34,13 +34,18 @@ SPInit:
 		BIOS_FDRSET									; Actually set the volume.
 		
 		BIOS_MSCSTOP								; Stop all CD playback.
-		lea		DriveInitParam(pc), a0				; Load drive initialization pramaters
+		lea	DriveInitParam(pc), a0					; Load drive initialization pramaters
 		BIOS_DRVINIT								; Read the ToC from the disc.
 		BIOS_CDCSTOP								; Stop any data read that might be going on
+		
+		; we can BRA since this rts's, saves 2 bytes and a bit of CPU time
+		;bra.w	PCM_InitialiseDriver				; Initialise the PCM driver.
 		
 		rts
 	
 SPMain:		
+		bsr.w	PCM_InitialiseDriver				; Initialise the PCM driver.
+		
 		move.b	#'S', $FF800F						; Tell the Main CPU we're alive
 		
 @waitForMainCPU:
@@ -139,9 +144,6 @@ PlayCDDAR:
 		move.w	$FF8010, (a0)						; Copy the track number into the table.
 		BIOS_MSCPLAYR								; Keep looping the track.
 		
-		move.w	#4, d1
-		BIOS_LEDSET
-		
 		move.b	#'D', $FF800F						; Clear busy flag.
 		moveq	#$1F, d0
 @loop:
@@ -168,6 +170,9 @@ CDDAResume:
 ; Plays a simple drum loop.
 ; The FD value for the samples is all 0x03EF.
 PlayPCM:
+;		move.w	#4, d1
+;		BIOS_LEDSET
+		
 		moveq	#0, d0								; Clear d0.	
 		move.b	#$FF, $FF0011						; Disable all channels.
 		bsr.w	PCMWait								; Wait for PCM chip. 
@@ -187,7 +192,7 @@ PlayPCM:
 		bsr.w	PCMWait								; Wait for PCM chip.
 		
 		lea		$FF2001, a2							; PCM Wave RAM to a2.
-		move.w	#$C5C, d0							; Second 4 KB of Sega Scream
+		move.w	#$C5C, d0							; Second 4 KB of the sample
 		
 @loop2:
 		move.b	(a1)+, (a2)							; Write a byte to Wave RAM.
@@ -218,19 +223,18 @@ PlayPCM:
 		bsr.s	PCMWait								; Wait for PCM chip.
 		move.b	#$C0, $F(a0)						; Enable sounding for channel 1.
 		bsr.s	PCMWait								; Wait for PCM chip.
-	
+		
 		bra.w	ReturnToMain						; Jump back to main loop.
 	
 PCMWait:
-		moveq  #$7F, d0								; Loop 127 times times.
+		moveq  #$7F, d0								; Loop 127 times.
 
 @PCMWaitLoop:
 		nop
 		nop
-		nop
-		nop
-		nop
 		dbf		d0, @PCMWaitLoop						; Loop.
+		
+		rts											; Return back to caller.
 	
 		
 ; ===============================================================================

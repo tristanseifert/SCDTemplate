@@ -1,14 +1,9 @@
-SCDDEMO_US.ISO
-SCDDEMO_EU.ISO
-SCDDEMO_JP.ISO
 MENU.BIN
 IP.BIN
-IP.LST
 FMV.BIN
 SP.BIN
-SP.LST
 SCDMAKE.INC
-menu/menu.lst
-common/loadermodule.lst
 common/loadermodule.bin
 .DS_Store
+*.lst
+*.iso

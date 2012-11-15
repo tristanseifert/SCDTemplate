@@ -1,16 +1,29 @@
 ; A few small config memory areas
-DriverStateArea:	EQU $30000
+DriverStateArea:	EQU $37E00
 ; $0 - Channels enabled (1 = sounding/enabled)
 ;
-SongStorageArea:	EQU $30200
+SongStorageArea:	EQU $38000
 SampleStorageArea:	EQU $40000
 
+Level3JumpTableLoc:	EQU	$00005F82
+
 ;---------------------------------------------------------------------------------------------------
-; LoadSong
+; PCM_InitialiseDriver
+;
+; Initialises the PCM driver, configuring it as the interrupt source and setting default
+; parameters in memory.
+;---------------------------------------------------------------------------------------------------
+PCM_InitialiseDriver:
+		move.w	#$4EB9, (Level3JumpTableLoc).w					; Use JSR opcode in jump table
+		move.l	#DriverMainLoop, (Level3JumpTableLoc+2).w		; Set the timer's main loop as LVL3 int
+		rts
+		
+;---------------------------------------------------------------------------------------------------
+; PCM_LoadSong
 ;
 ; Loads the song ID specified in d0 to the driver's storage areas.
 ;---------------------------------------------------------------------------------------------------
-LoadSong:
+PCM_LoadSong:
 		move.w	#0, DriverStateArea					; Disable sounding of all channels - not playing.
 
 		lea		SongIDArray(pc), a0					; Load the song array to a0.
@@ -21,7 +34,7 @@ LoadSong:
 		and.l	#$FFFF0000, d1						; Get size by itself.
 		swap	d1									; Swap high word to low
 		
-		lea		ReadCD_Packet(pc), a5				; Load the packet address to a5.
+		lea		PCM_ReadCD_Packet(pc), a5			; Load the packet address to a5.
 		move.l	(a0, d0.w), (a5)					; Load the start sector from the table.
 		move.l	d1, 4(a5)							; Load the size of file in sectors to the packet.
 		move.l	#SongStorageArea, 8(a5)				; Load the destination to the packet.
@@ -33,7 +46,7 @@ LoadSong:
 		lsl.w	#3, d0								; Multiply by 8.
 		lea		(a0, d0.w), a0						; Get entry into table
 		
-		lea		ReadCD_Packet(pc), a5				; Load the packet address to a5.
+		lea		PCM_ReadCD_Packet(pc), a5			; Load the packet address to a5.
 		move.l	(a0), (a5)							; Load the start sector from the table.
 		move.l	4(a0), 4(a5)						; Load the size of file in sectors to the packet.
 		move.l	#SampleStorageArea, 8(a5)			; Load the destination to the packet.
@@ -42,11 +55,11 @@ LoadSong:
 		rts
 
 ;---------------------------------------------------------------------------------------------------
-; LoadSampleToChip
+; PCM_LoadSampleToChip
 ;
 ; Loads a new sample to the chip (d0 is channel, d1 is the ID of the sample)
 ;---------------------------------------------------------------------------------------------------
-LoadSampleToChip:
+PCM_LoadSampleToChip:
 		lea		SampleStorageArea, a0
 		lsl.w	#2, d0								; Multiply d0 by 4 to get sample offset
 		move.l	(a0, d0.w), d2						; Get offset of the sample.
@@ -107,7 +120,7 @@ PCM_ReadCD:
 		bne.s	@checkIfPrepared					; If there's more data to read, branch.
 		rts
 		
-NoteFDEquivs:   
+PCM_NoteFDEquivs:   
 		dc.w 0                  ; rest
 		dc.w $104               ; C0 
 		dc.w $113               ; C#0 
@@ -216,17 +229,17 @@ SampleBanks:
 		dc.l	0
 		
 
-ReadCD_Packet:
-		dc.l	$10, 1, $8000, ReadCD_ExtraJunk, 0			; sector to read, number of sectors to read, Pointer to dest. buffer, header buffer, terminator?
+PCM_ReadCD_Packet:
+		dc.l	$10, 1, $8000, PCM_ReadCD_ExtraJunk, 0			; sector to read, number of sectors to read, Pointer to dest. buffer, header buffer, terminator?
 		
-ReadCD_ExtraJunk:
+PCM_ReadCD_ExtraJunk:
 		dc.b	0
 		even
 
 ;---------------------------------------------------------------------------------------------------
 ; DriverMainLoop
 ;
-; The driver's main loop
+; The driver's main loop, called every timer interrupt.
 ;---------------------------------------------------------------------------------------------------
 DriverMainLoop:
 
@@ -242,4 +255,8 @@ DriverMainLoop:
 ;---------------------------------------------------------------------------------------------------
 
 LoopRoutines:
-		dc.l	
+		dc.l	@defaultLoopRoutine
+		
+@defaultLoopRoutine:
+		move.b	#$FF, d0
+		rts
