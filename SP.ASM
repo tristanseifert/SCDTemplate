@@ -260,6 +260,8 @@ DriveInitParam:	dc.w	$01FF
 SPInt:
 		movem.l	d0-a6, -(sp)						; Back up all registers
 
+		bsr.w	DriverMainLoop						; Run PCM driver.
+
 		movem.l	(sp)+, d0-a6						; Restore registers.
 		rts
 		

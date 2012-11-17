@@ -1,7 +1,7 @@
 ; A few small config memory areas
 DriverStateArea:	EQU $37E00
 ; $00 - Channels enabled (1 = sounding/enabled)
-
+; $01 - Song loaded flag.
 ; $02 - PCM Channel 1 current offset
 ; $04 - PCM Channel 2 current offset
 ; $06 - PCM Channel 3 current offset
@@ -20,11 +20,62 @@ Level3JumpTableLoc:	EQU	$00005F82
 ; PCM_InitialiseDriver
 ;
 ; Initialises the PCM driver, configuring it as the interrupt source and setting default
-; parameters in memory.
+; parameters in memory, and initialising PCM registers.
 ;---------------------------------------------------------------------------------------------------
 PCM_InitialiseDriver:
-		move.w	#$4EB9, (Level3JumpTableLoc).w					; Use JSR opcode in jump table
-		move.l	#DriverMainLoop, (Level3JumpTableLoc+2).w		; Set the timer's main loop as LVL3 int
+;		move.w	#$4EB9, (Level3JumpTableLoc).w					; Use JSR opcode in jump table
+;		move.l	#DriverMainLoop, (Level3JumpTableLoc+2).w		; Set the timer's main loop as LVL3 int
+		
+		bclr	#0, DriverStateArea+$1							; No song is loaded.
+		
+		lea		$FF0000, a1										; PCM chip to a1 
+		moveq	#7, d7											; Loop over 8 channels.
+		moveq	#0, d0											; Clear d0.
+		
+		moveq	#0, d2											; Channel's ST data
+		
+@initChannel:
+		moveq	#7, d0											; Channel into d0
+		sub.b	d7, d0											; Subtract loop counter.
+
+		moveq	#0, d1											; Clear d1.
+		move.b	d0, d1											; Get the channel.
+		bset	#7, d1											; Make sure sounding is enabled.
+		bset	#6, d1											; Enable "MOD" bit.
+		move.b	d1, $F(a1)										; Set the control register to allow register modifications.
+
+		move.b	d2, $D(a1)										; Write channel ST data to PCM chip
+		bsr.s	PCM_WaitForRF5C164								; Wait for PCM chip.
+		move.b	d2, $B(a1)										; Set LSH to ST value.
+		bsr.s	PCM_WaitForRF5C164								; Wait for PCM chip.
+		move.b	#0, $9(a1)										; Set LSL to 0. (Sample loops.)
+		bsr.s	PCM_WaitForRF5C164								; Wait for PCM chip.
+		move.b	#0, $7(a1)										; FDH set to 0 (no sounding of this channel.)
+		bsr.s	PCM_WaitForRF5C164								; Wait for PCM chip.
+		move.b	#0, $5(a1)										; FDL set to 0 (no sounding of this channel.)
+		bsr.s	PCM_WaitForRF5C164								; Wait for PCM chip.
+		move.b	#$FF, $3(a1)									; Centred pan.
+		bsr.s	PCM_WaitForRF5C164								; Wait for PCM chip.
+		move.b	#$D0, $1(a1)									; Set envelope data.
+
+		add.b	#$20, d2										; Add to the ST data for the next channel.
+		dbf		d7, @initChannel								; Keep looping.
+		
+		rts
+
+; This routine delays the code between register writes since the RF5C154 is a slow piece of shit.
+PCM_WaitForRF5C164:
+		move.l	d0, -(sp)										; Back up d0.
+
+		moveq	#$14, d0										; Number of cycles to burn.
+		
+		; Each loop iteration is 4+4+10 = 18 cycles, plus 18 when exiting.
+@burnCycles:
+		nop
+		nop
+		dbf		d0, @burnCycles									; Keep looping.
+		
+		move.l	(sp)+, d0										; Restore d0.
 		rts
 		
 ;---------------------------------------------------------------------------------------------------
@@ -82,6 +133,11 @@ PCM_LoadSong:
 		
 		move.l	#"REND", DriverStateArea+$50					; Mark the end of the driver state area. (For memory dumps)
 		
+		lea		$FF0000, a1										; PCM chip to a1 
+		move.b	#$FF, $11(a1)									; Enable sounding for all channels.
+		
+		bset	#0, DriverStateArea+$1							; We just loaded a song.
+		
 		rts
 
 ;---------------------------------------------------------------------------------------------------
@@ -113,8 +169,8 @@ PCM_LoadSampleToChip:
 		move.b	d0, d1											; Get the channel.
 		bset	#7, d1											; Make sure sounding is enabled.
 		bset	#6, d1											; Enable "MOD" bit.
-		
 		move.b	d1, $F(a1)										; Set the control register to allow register modifications.
+		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
 		
 		; Set up the PCM chip with the right bank for the channel.
 		moveq	#0, d1											; Clear d2 — MOD is disabled, we select 4k bank.
@@ -174,7 +230,7 @@ PCM_LoadSampleToChip:
 ;---------------------------------------------------------------------------------------------------
 ; PCM_ReadCD
 ;
-; Reads a specified number of sectoruus from the disc.
+; Reads a specified number of sectors from the disc.
 ;---------------------------------------------------------------------------------------------------
 	
 PCM_ReadCD:	
@@ -338,6 +394,9 @@ PCM_ReadCD_ExtraJunk:
 ; of Japan programmers were involved in the process of writing it.
 ;---------------------------------------------------------------------------------------------------
 DriverMainLoop:
+		btst	#0, DriverStateArea+$1							; Is a song loaded?
+		beq.s	@noSongLoaded									; If no song is loaded, exit.
+
 		moveq	#7, d7											; Process all 8 PCM channels.
 		lea		DriverStateArea+$2, a5							; Driver state area.
 		lea		DriverStateArea+$20, a4							; Each channel has 8 bytes starting at $20.
@@ -374,6 +433,7 @@ DriverMainLoop:
 
 		dbf		d7, @processChannels							; Loop until all channels are processed.
 
+@noSongLoaded:
 		rts
 		
 ; Called by the main loop to transfer the FD value in d0 to the PCM chip.
@@ -394,10 +454,12 @@ DriverMainLoop:
 		bset	#6, d1											; Enable "MOD" bit.
 		
 		move.b	d1, $F(a1)										; Set the control register to allow register modifications.
+		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
 	
 		move.w	d0, d1											; Get the value to d1.
 		and.w	#$FF, d1										; Get only the low part.
 		move.b	d1, $5(a1)										; Write the low part of the FD.
+		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
 	
 		move.w	d0, d1											; Get the value to d1.
 		and.w	#$FF00, d1										; Get only the high part.
