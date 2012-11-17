@@ -169,9 +169,14 @@ CDDAResume:
 
 ; Plays a simple drum loop.
 ; The FD value for the samples is all 0x03EF.
-PlayPCM:
-;		move.w	#4, d1
-;		BIOS_LEDSET
+PlayPCM:		
+		moveq	#0, d0								; Song 0
+		bsr.w	PCM_LoadSong
+
+		move.w	#4, d1
+		BIOS_LEDSET
+
+		bra.w	ReturnToMain
 		
 		moveq	#0, d0								; Clear d0.	
 		move.b	#$FF, $FF0011						; Disable all channels.
@@ -304,16 +309,6 @@ Packet:
 		
 ExtraJunk:
 		dc.b	0
-		even
-		
-Sample_Drum1:
-		incbin	"PCM/drum1.pcm"
-		dc.b	$FF, $FF, $FF, $FF
-		even
-		
-Sample_Drum2:
-		incbin	"PCM/drum2.pcm"
-		dc.b	$FF, $FF, $FF, $FF
 		even
 		
 Sample_Piano:

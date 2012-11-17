@@ -69,6 +69,13 @@ EntryPoint:
 		move.b	#5, $A1200E							; Play a PCM sample
 
 @waitSubCPU:
+		rept 8
+		nop
+		nop
+		nop
+		nop
+		nop
+		endr
 		cmp.b	#'B', $A1200F						; Is it still processing?
 		beq.s	@waitSubCPU							; If so, branch.
 		

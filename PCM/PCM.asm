@@ -1,7 +1,16 @@
 ; A few small config memory areas
 DriverStateArea:	EQU $37E00
-; $0 - Channels enabled (1 = sounding/enabled)
-;
+; $00 - Channels enabled (1 = sounding/enabled)
+
+; $02 - PCM Channel 1 current offset
+; $04 - PCM Channel 2 current offset
+; $06 - PCM Channel 3 current offset
+; $08 - PCM Channel 4 current offset
+; $0A - PCM Channel 5 current offset
+; $0C - PCM Channel 6 current offset
+; $0E - PCM Channel 7 current offset
+; $10 - PCM Channel 8 current offset
+
 SongStorageArea:	EQU $38000
 SampleStorageArea:	EQU $40000
 
@@ -24,61 +33,133 @@ PCM_InitialiseDriver:
 ; Loads the song ID specified in d0 to the driver's storage areas.
 ;---------------------------------------------------------------------------------------------------
 PCM_LoadSong:
-		move.w	#0, DriverStateArea					; Disable sounding of all channels - not playing.
+		move.w	#0, DriverStateArea								; Disable sounding of all channels - not playing.
 
-		lea		SongIDArray(pc), a0					; Load the song array to a0.
-		lsl.w	#3, d0								; Multiply by 8.
+		lea		SongIDArray(pc), a0								; Load the song array to a0.
+		lsl.w	#3, d0											; Multiply by 8.
 
-		move.l	4(a0, d0.w), d1						; Size and sample bank ID.
-		move.l	d1, -(sp)							; Write to stack.
-		and.l	#$FFFF0000, d1						; Get size by itself.
-		swap	d1									; Swap high word to low
+		move.l	4(a0, d0.w), d1									; Size (in sectors)
 		
-		lea		PCM_ReadCD_Packet(pc), a5			; Load the packet address to a5.
-		move.l	(a0, d0.w), (a5)					; Load the start sector from the table.
-		move.l	d1, 4(a5)							; Load the size of file in sectors to the packet.
-		move.l	#SongStorageArea, 8(a5)				; Load the destination to the packet.
-		bsr.w	ReadCD								; Read from the disc.
+		lea		PCM_ReadCD_Packet(pc), a5						; Load the packet address to a5.
+		move.l	(a0, d0.w), (a5)								; Load the start sector from the table.
+		move.l	d1, 4(a5)										; Load the size of file in sectors to the packet.
+		move.l	#SongStorageArea, 8(a5)							; Load the destination to the packet.
+		bsr.w	PCM_ReadCD										; Read from the disc.
 		
-		lea		SampleBanks(pc), a0					; Load sample bank table to a0.
-		move.l	(sp)+, d0							; Get size and sample bank ID to d0.
-		and.l	#$FFFF, d0							; Get rid of size byte.
-		lsl.w	#3, d0								; Multiply by 8.
-		lea		(a0, d0.w), a0						; Get entry into table
+		lea		SampleBanks(pc), a0								; Load sample bank table to a0.
+		moveq	#0, d0											; Clear d0.
+		move.b	SongStorageArea, d0								; Get sample bank to use.
+		lsl.w	#3, d0											; Multiply by 8.
+		lea		(a0, d0.w), a0									; Get entry into table
 		
-		lea		PCM_ReadCD_Packet(pc), a5			; Load the packet address to a5.
-		move.l	(a0), (a5)							; Load the start sector from the table.
-		move.l	4(a0), 4(a5)						; Load the size of file in sectors to the packet.
-		move.l	#SampleStorageArea, 8(a5)			; Load the destination to the packet.
-		bsr.w	ReadCD								; Read from the disc.
+		lea		PCM_ReadCD_Packet(pc), a5						; Load the packet address to a5.
+		move.l	(a0), (a5)										; Load the start sector from the table.
+		move.l	4(a0), 4(a5)									; Load the size of file in sectors to the packet.
+		move.l	#SampleStorageArea, 8(a5)						; Load the destination to the packet.
+		bsr.w	PCM_ReadCD										; Read from the disc.
+		
+		move.b	SongStorageArea+$2, ($FFFF8031).w				; Set the interrupt timer value.
+		
+		moveq	#0, d0											; Clear d0, the loop counter.
+		move.b	SongStorageArea+$1, d0							; Number of channels to use.
+
+		lea		SongStorageArea+$4, a0							; Track pointer thingies
+		lea		DriverStateArea+$1, a1							; PCM1 track offset.
+
+@setUpInitialChannelData:
+		move.w	(a0), (a1)+										; Get the initial track location to the state area.
+		addq.l	#4, a0											; Move over to the next channel.		
+		dbf		d0, @setUpInitialChannelData					; Keep looping until all channels are initialised.
+		
+		move.l	#"REND", DriverStateArea+$40					; Mark the end of the driver state area. (For memory dumps)
 		
 		rts
 
 ;---------------------------------------------------------------------------------------------------
 ; PCM_LoadSampleToChip
 ;
-; Loads a new sample to the chip (d0 is channel, d1 is the ID of the sample)
+; Loads a new sample to the chip (d0 is channel (1-8), d1 is the ID of the sample)
+;
+; Breaks: 	a0, a1, a2 
+; 			d0, d1, d2
 ;---------------------------------------------------------------------------------------------------
 PCM_LoadSampleToChip:
-		lea		SampleStorageArea, a0
-		lsl.w	#2, d0								; Multiply d0 by 4 to get sample offset
-		move.l	(a0, d0.w), d2						; Get offset of the sample.
-		add.l	d2, a0								; Add offset of the sample to the storage area.
+		movem.l	d0-d2/a0-a2, -(sp)								; Back up the registers we mangle.
+
+		lea		SampleStorageArea, a0							; Sample bank storage
+		lea		$FF0000, a1										; PCM chip to a1 
+		lea		$2001(a1), a2									; PCM wave RAM ($FF2001)
 		
-		lea		$FF0000, a1							; PCM chip to a1 
+		lsl.w	#3, d1											; Multiply d0 by 8 to get sample offset into the table.
+		add.l	(a0, d1.w), a0									; Add offset of the sample — a0 is sample location.
+		move.l	4(a0, d1.w), d2									; Get the size of the sample.
 		
-		subq.b	#1, d0								; Subtract one for the proper bit numbers
-		bclr	d0, DriverStateArea					; Disable current channel
-		move.b	DriverStateArea, $11(a1)			; Write enabled channels
+		; d1 and d2 can be abused at this point, d3 holds sample size
+		subq.b	#1, d0											; Subtract one for the proper bit numbers
+		bclr	d0, DriverStateArea								; Disable current channel
+		move.b	DriverStateArea, $11(a1)						; Write enabled channels
+			
+		; Configure the PCM chip to access the selected channel's registers.
+		moveq	#0, d1											; Clear d2.
+		move.b	d0, d1											; Get the channel.
+		bset	#7, d1											; Make sure sounding is enabled.
+		bset	#6, d1											; Enable "MOD" bit.
 		
-		move.b	#$4, 7(a1)							; Reset FDH
-		move.b	#$15, 5(a1)							; Reset FDL
+		move.b	d1, $F(a1)										; Set the control register to allow register modifications.
 		
-		bset	d0, DriverStateArea					; Enable current channel
-		move.b	DriverStateArea, $11(a1)			; Write enabled channels
+		; Set up the PCM chip with the right bank for the channel.
+		moveq	#0, d1											; Clear d2 — MOD is disabled, we select 4k bank.
+		move.b	d0, d1											; Get the channel.
+		add.b	d2, d1											; Multiply by two.
+		bset	#7, d1											; Make sure sounding is enabled.
+		move.b	d1, $F(a1)										; Update the control register to write to the bank for the channel.
 		
-		; ----- insert code to copy the sample to the PCM chip here -----
+		; See if sample is > 4K
+		cmp.w	#$FFF, d2										; Is the size less than 4K?
+		bhs.s	@sampleMoreThan4K								; If not, branch.
 		
+		; Only copy what is needed.
+		move.w	d2, d1											; Copy size (since < 4K) to loop counter
+		bra.s	@copyFirst4K									; Jump into the loop.
+		
+		; Copy the first 4K.
+@sampleMoreThan4K:
+		move.w	#$FFF, d1										; Copy a 4K block first.
+		
+		; Begin copying to PCM RAM.
+@copyFirst4K:
+		move.b	(a0)+, (a2)										; Copy a byte of PCM data.
+		addq.l	#2, a2											; Increase PCM address.
+		dbf		d1, @copyFirst4K								; Keep looping.
+		
+		; If it was less than 4K, we're done here.
+		cmp.w	#$FFF, d3										; Is the sample's size less than 4K?
+		bls.s	@noMoreCopyNeeded								; If so, we're done here.
+		
+		; Configure the PCM chip to the second 4K bank for the channel.
+		moveq	#0, d1											; Clear d2 — MOD is disabled, we select 4k bank.
+		move.b	d0, d1											; Get the channel.
+		add.b	d2, d1											; Multiply by two.
+		bset	#0, d1											; Second bank for the channel.
+		bset	#7, d1											; Make sure sounding is enabled.
+		move.b	d1, $F(a1)										; Update the control register to write to the bank for the channel.
+		
+		; Reset pointers and copy.
+		lea		$2001(a1), a2									; Reset a2 to PCM wave RAM.
+		move.w	d2, d1											; Copy the sample length to d2.
+		sub	.w	#$1000, d1										; Subtract 4K from it.
+		
+@copyMorePCMData:
+		move.b	(a0)+, (a2)										; Copy a byte of PCM data.
+		addq.l	#2, a2											; Increase PCM address.
+		dbf		d1, @copyMorePCMData							; Keep looping.
+
+		; Restore registers and exit.
+@noMoreCopyNeeded:		
+		bset	d0, DriverStateArea								; Enable current channel
+		move.b	DriverStateArea, $11(a1)						; Write enabled channels
+		
+		movem.l	(sp)+, d0-d2/a0-a2								; Restore the registers we mangled.
 		rts
 	
 ;---------------------------------------------------------------------------------------------------
@@ -219,8 +300,8 @@ PCM_NoteFDEquivs:
 		dc.w $F0B5              ; A#7
 		
 SongIDArray:
-		; An entry is like so: dc.l song_sector, high: size, low:sample_bank_id
-		dc.l	0, $00120001
+		; An entry is like so: dc.l song_sector, song_size_in_sectors
+		dc.l	FILE_PCMSONG__BIN_START_SECTOR, FILE_PCMSONG__BIN_SIZE_SECTORS
 		dc.l	0
 		
 SampleBanks:
@@ -240,8 +321,24 @@ PCM_ReadCD_ExtraJunk:
 ; DriverMainLoop
 ;
 ; The driver's main loop, called every timer interrupt.
+;
+; Destroys: Everything! =V
+;
+; a6, a5, d7 and d6 should not be touched by subroutines — however, if they are, they have to be
+; backed up and restored properly or the driver might blow up and crash about as bad as if SEGA
+; of Japan programmers were involved in the process of writing it.
 ;---------------------------------------------------------------------------------------------------
 DriverMainLoop:
+		moveq	#7, d7											; Process all 8 PCM channels.
+		lea		DriverStateArea+$2, a5							; Driver state area.
+
+@processChannels:
+		lea		SongStorageArea, a6								; Area of song storage.
+		add.w	(a5)+, a6										; Get the current channel's offset.
+
+		
+
+		dbf		d7, @processChannels							; Loop until all channels are processed.
 
 		rts
 
