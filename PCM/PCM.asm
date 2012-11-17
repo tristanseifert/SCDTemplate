@@ -58,20 +58,29 @@ PCM_LoadSong:
 		move.l	#SampleStorageArea, 8(a5)						; Load the destination to the packet.
 		bsr.w	PCM_ReadCD										; Read from the disc.
 		
+		lea		DriverStateArea, a0								; Driver state area.
+		moveq	#0, d0											; Clear d0.
+		moveq	#$1F, d7										; Clear 32 * 8 bytes of song state memory.
+		
+@clearStateRAM:
+		move.l	d0, (a0)+										; Clear 4 bytes.
+		move.l	d0, (a0)+										; Clear 4 bytes.
+		dbf		d7, @clearStateRAM								; Loop until everything is cleared.
+		
 		move.b	SongStorageArea+$2, ($FFFF8031).w				; Set the interrupt timer value.
 		
 		moveq	#0, d0											; Clear d0, the loop counter.
 		move.b	SongStorageArea+$1, d0							; Number of channels to use.
 
 		lea		SongStorageArea+$4, a0							; Track pointer thingies
-		lea		DriverStateArea+$1, a1							; PCM1 track offset.
+		lea		DriverStateArea+$2, a1							; PCM1 track offset.
 
 @setUpInitialChannelData:
 		move.w	(a0), (a1)+										; Get the initial track location to the state area.
 		addq.l	#4, a0											; Move over to the next channel.		
 		dbf		d0, @setUpInitialChannelData					; Keep looping until all channels are initialised.
 		
-		move.l	#"REND", DriverStateArea+$40					; Mark the end of the driver state area. (For memory dumps)
+		move.l	#"REND", DriverStateArea+$50					; Mark the end of the driver state area. (For memory dumps)
 		
 		rts
 
@@ -147,7 +156,7 @@ PCM_LoadSampleToChip:
 		; Reset pointers and copy.
 		lea		$2001(a1), a2									; Reset a2 to PCM wave RAM.
 		move.w	d2, d1											; Copy the sample length to d2.
-		sub	.w	#$1000, d1										; Subtract 4K from it.
+		sub.w	#$1000, d1										; Subtract 4K from it.
 		
 @copyMorePCMData:
 		move.b	(a0)+, (a2)										; Copy a byte of PCM data.
@@ -322,27 +331,151 @@ PCM_ReadCD_ExtraJunk:
 ;
 ; The driver's main loop, called every timer interrupt.
 ;
-; Destroys: Everything! =V
+; Destroys: Everything! (srsly, it does) =V
 ;
-; a6, a5, d7 and d6 should not be touched by subroutines — however, if they are, they have to be
+; a6, a5, a4, d7 and d6 should not be touched by subroutines — however, if they are, they have to be
 ; backed up and restored properly or the driver might blow up and crash about as bad as if SEGA
 ; of Japan programmers were involved in the process of writing it.
 ;---------------------------------------------------------------------------------------------------
 DriverMainLoop:
 		moveq	#7, d7											; Process all 8 PCM channels.
 		lea		DriverStateArea+$2, a5							; Driver state area.
+		lea		DriverStateArea+$20, a4							; Each channel has 8 bytes starting at $20.
 
 @processChannels:
 		lea		SongStorageArea, a6								; Area of song storage.
-		add.w	(a5)+, a6										; Get the current channel's offset.
+		add.w	(a5), a6										; Get the current channel's offset.
 
+@pcmProcessCommand:
+		cmp.b	#$D0, (a6)										; Is this instruction a flag?
+		bhs.w	@proccessFlag									; If so, branch.
+
+		; We process all flags following each other until we hit a note.
+		subq.b	#1, (a4)										; Subtract from the time.
+		cmp.b	#$FF, (a4)										; Are we ready to process the next note?
+		bne.s	@pcmDoneProcessing								; If not, branch.
 		
+		moveq	#0, d0											; Clear d0.
+		move.b	(a6)+, d0										; Get note to d0.
+		add.w	d0, d0											; Multiply by two.
+		lea		PCM_NoteFDEquivs(pc), a0		 				; Get note table address to a0
+		move.w	(a0, d0.w), d0									; Get the right note value to d0
+
+		move.b	(a6)+, (a4)										; Set the timer value.
+
+		; Now we get to transfer this value to the PCM chip.
+		bsr.w	@transferFDToPCM								; Call subroutine to transfer.
+
+@pcmDoneProcessing:
+		; When we're done, write the current song offset.
+		sub.l	#SongStorageArea, a6							; Subtract base from it
+		move.w	a6, (a5)+										; Write it to memory.
+		lea		$8(a4), a4										; Next channel's memory.
 
 		dbf		d7, @processChannels							; Loop until all channels are processed.
 
 		rts
+		
+; Called by the main loop to transfer the FD value in d0 to the PCM chip.
+;
+; Destroys: a1, d1, d2
 
+@transferFDToPCM:
+		movem.l	d1-d2/a1, -(sp)									; Back up registers.
+		lea		$FF0000, a1										; PCM chip to a1 
+	
+		moveq	#7, d2											; 8 channels
+		sub.b	d7, d2											; Subtract loop counter from it.
+			
+		; Configure the PCM chip to access the selected channel's registers.
+		moveq	#0, d1											; Clear d2.
+		move.b	d2, d1											; Get the channel.
+		bset	#7, d1											; Make sure sounding is enabled.
+		bset	#6, d1											; Enable "MOD" bit.
+		
+		move.b	d1, $F(a1)										; Set the control register to allow register modifications.
+	
+		move.w	d0, d1											; Get the value to d1.
+		and.w	#$FF, d1										; Get only the low part.
+		move.b	d1, $5(a1)										; Write the low part of the FD.
+	
+		move.w	d0, d1											; Get the value to d1.
+		and.w	#$FF00, d1										; Get only the high part.
+		lsr.w	#8, d1											; Shift it into the low position.
+		move.b	d1, $7(a1)										; Write the high part of the FD.
+	
+		movem.l	(sp)+, d1-d2/a1									; Restore registers.
+		rts
 
+; Called by the main loop to process a flag.
+; a6 has the pointer to the byte after the instruction.
+; 
+; Destroys: d0
+
+@proccessFlag:
+		movem.l	d0-d1/a0, -(sp)									; Back up registers.
+
+		move.b	(a6)+, d0										; Copy the command.
+		sub.w	#$D0, d0										; Subtract command offset.
+		add.w	d0, d0											; Multiply by 2
+		add.w	d0, d0											; Multiply by 2
+		
+		move.l	@flagRoutines(pc, d0.w), a0						; Get the offset out of the table.
+		jsr		(a0)											; Jump to the correct routine.
+
+		movem.l	(sp)+, d0-d1/a0									; Restore registers.
+		bra.w	@pcmProcessCommand								; Return back to the driver.
+		
+@flagRoutines:
+		dc.l	PCM_ChangeInstrument							; $D0
+		dc.l	PCM_ChangePan
+		dc.l	PCM_SetNoteDisp
+		dc.l	PCM_Loop
+		dc.l	PCM_SetVolume
+		dc.l	PCM_RegJmp										; $D5
+		dc.l	PCM_CondJmp
+		
+; Routine to change the current channel's PCM sample.
+; Destroys: d0, d1
+
+PCM_ChangeInstrument:		
+		move.b	(a6)+, d1										; Get sample to load.
+		moveq	#8, d0											; Channel.
+		sub.b	d7, d0											; Subtract current loop iteration.
+		bsr.w	PCM_LoadSampleToChip							; Load new sample to chip (d0=chan, d1=sample)
+		
+		rts
+
+; Routine jumps back or forward a specific amount of bytes.
+PCM_RegJmp:
+		moveq	#0, d0											; Clear d0.
+		move.b	(a6)+, d0										; Get the high word.
+		lsl.w	#8, d0											; Shift it into position.
+		move.b	(a6)+, d0										; Get the low word.
+		
+		lea		-3(a6), a6										; Rewind 3 bytes.
+		
+		btst	#15, d0											; Is it a negative displacement?
+		bne.s	@negDisplace									; If so, branch.
+
+		add.l	d0, a6											; Add to the offset.
+
+		bra.s	@continue										; Branch over negative displacement code.
+
+@negDisplace:
+		bclr	#15, d0											; Clear sign bit.
+		sub.l	d0, a6											; Subtract from the offset.
+
+@continue:
+		rts
+		
+PCM_ChangePan:
+PCM_SetNoteDisp:
+PCM_Loop:
+PCM_SetVolume:
+PCM_CondJmp:
+		rts
+		
 ;---------------------------------------------------------------------------------------------------
 ; LoopRoutines
 ;

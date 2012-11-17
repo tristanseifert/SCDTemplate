@@ -173,9 +173,6 @@ PlayPCM:
 		moveq	#0, d0								; Song 0
 		bsr.w	PCM_LoadSong
 
-		move.w	#4, d1
-		BIOS_LEDSET
-
 		bra.w	ReturnToMain
 		
 		moveq	#0, d0								; Clear d0.	
