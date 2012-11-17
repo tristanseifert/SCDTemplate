@@ -221,7 +221,7 @@ PlayPCM:
 		
 		move.b	#$FE, $11(a0)						; Enable channel 1
 		bsr.s	PCMWait								; Wait for PCM chip.
-		move.b	#$00, $C(a0)						; Set start address to $0000
+		move.b	#$00, $D(a0)						; Set start address to $0000
 		bsr.s	PCMWait								; Wait for PCM chip.
 		move.b	#$C0, $F(a0)						; Enable sounding for channel 1.
 		bsr.s	PCMWait								; Wait for PCM chip.

@@ -134,7 +134,8 @@ PCM_LoadSong:
 		move.l	#"REND", DriverStateArea+$50					; Mark the end of the driver state area. (For memory dumps)
 		
 		lea		$FF0000, a1										; PCM chip to a1 
-		move.b	#$FF, $11(a1)									; Enable sounding for all channels.
+		;move.b	#$FF, $11(a1)									; Enable sounding for all channels.
+		move.b	#$00, $11(a1)									; Enable sounding for all channels.
 		
 		bset	#0, DriverStateArea+$1							; We just loaded a song.
 		
@@ -154,6 +155,8 @@ PCM_LoadSampleToChip:
 		lea		SampleStorageArea, a0							; Sample bank storage
 		lea		$FF0000, a1										; PCM chip to a1 
 		lea		$2001(a1), a2									; PCM wave RAM ($FF2001)
+		
+		move.b	#$FF, $11(a1)									; Disable sounding for all channels.
 		
 		lsl.w	#3, d1											; Multiply d0 by 8 to get sample offset into the table.
 		add.l	(a0, d1.w), a0									; Add offset of the sample — a0 is sample location.
@@ -220,7 +223,17 @@ PCM_LoadSampleToChip:
 		dbf		d1, @copyMorePCMData							; Keep looping.
 
 		; Restore registers and exit.
-@noMoreCopyNeeded:		
+@noMoreCopyNeeded:	
+		; Configure the PCM chip to access the selected channel's registers.
+		moveq	#0, d1											; Clear d2.
+		move.b	d0, d1											; Get the channel.
+		bset	#7, d1											; Make sure sounding is enabled.
+		bset	#6, d1											; Enable "MOD" bit.
+		move.b	d1, $F(a1)										; Set the control register to allow register modifications.
+		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
+
+		move.b	#$00, $11(a1)									; Enable sounding for all channels.
+		
 		bset	d0, DriverStateArea								; Enable current channel
 		move.b	DriverStateArea, $11(a1)						; Write enabled channels
 		
