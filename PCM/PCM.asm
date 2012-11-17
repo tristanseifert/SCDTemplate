@@ -29,6 +29,8 @@ PCM_InitialiseDriver:
 		bclr	#0, DriverStateArea+$1							; No song is loaded.
 		
 		lea		$FF0000, a1										; PCM chip to a1 
+		move.b	#$FF, $11(a1)									; Disable sounding for all channels.
+		
 		moveq	#7, d7											; Loop over 8 channels.
 		moveq	#0, d0											; Clear d0.
 		
@@ -60,6 +62,8 @@ PCM_InitialiseDriver:
 
 		add.b	#$20, d2										; Add to the ST data for the next channel.
 		dbf		d7, @initChannel								; Keep looping.
+		
+		move.b	#$00, $11(a1)									; Enable sounding for all channels.
 		
 		rts
 
@@ -137,7 +141,7 @@ PCM_LoadSong:
 		;move.b	#$FF, $11(a1)									; Enable sounding for all channels.
 		move.b	#$00, $11(a1)									; Enable sounding for all channels.
 		
-		bset	#0, DriverStateArea+$1							; We just loaded a song.
+		move.b	#1, DriverStateArea+$1							; We just loaded a song.
 		
 		rts
 
@@ -148,6 +152,7 @@ PCM_LoadSong:
 ;
 ; Breaks: 	a0, a1, a2 
 ; 			d0, d1, d2
+;			(Backed up and restored)
 ;---------------------------------------------------------------------------------------------------
 PCM_LoadSampleToChip:
 		movem.l	d0-d2/a0-a2, -(sp)								; Back up the registers we mangle.
@@ -174,6 +179,9 @@ PCM_LoadSampleToChip:
 		bset	#6, d1											; Enable "MOD" bit.
 		move.b	d1, $F(a1)										; Set the control register to allow register modifications.
 		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
+		move.b	#$03, $7(a1)									; Set FDH to $03
+		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
+		move.b	#$EF, $5(a1)									; Set FDL to $EF
 		
 		; Set up the PCM chip with the right bank for the channel.
 		moveq	#0, d1											; Clear d2 — MOD is disabled, we select 4k bank.
@@ -236,6 +244,14 @@ PCM_LoadSampleToChip:
 		
 		bset	d0, DriverStateArea								; Enable current channel
 		move.b	DriverStateArea, $11(a1)						; Write enabled channels
+		
+		move.b	#"T", (a2)
+		move.b	#"E", 2(a2)
+		move.b	#"S", 4(a2)
+		move.b	#"T", 6(a2)
+		move.b	#"$", 8(a2)
+		moveq	#4, d1
+		BIOS_LEDSET
 		
 		movem.l	(sp)+, d0-d2/a0-a2								; Restore the registers we mangled.
 		rts
@@ -407,8 +423,8 @@ PCM_ReadCD_ExtraJunk:
 ; of Japan programmers were involved in the process of writing it.
 ;---------------------------------------------------------------------------------------------------
 DriverMainLoop:
-		btst	#0, DriverStateArea+$1							; Is a song loaded?
-		beq.s	@noSongLoaded									; If no song is loaded, exit.
+		cmp.b	#1, DriverStateArea+$1							; Is a song loaded?
+		bne.s	@noSongLoaded									; If no song is loaded, exit.
 
 		moveq	#7, d7											; Process all 8 PCM channels.
 		lea		DriverStateArea+$2, a5							; Driver state area.
@@ -418,7 +434,7 @@ DriverMainLoop:
 		lea		SongStorageArea, a6								; Area of song storage.
 		add.w	(a5), a6										; Get the current channel's offset.
 
-@pcmProcessCommand:
+@pcmProcessCommand:		
 		cmp.b	#$D0, (a6)										; Is this instruction a flag?
 		bhs.w	@proccessFlag									; If so, branch.
 

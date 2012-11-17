@@ -170,8 +170,14 @@ CDDAResume:
 ; Plays a simple drum loop.
 ; The FD value for the samples is all 0x03EF.
 PlayPCM:		
+;		bsr.w	PCM_InitialiseDriver
+
 		moveq	#0, d0								; Song 0
 		bsr.w	PCM_LoadSong
+
+;		moveq	#0, d0
+;		moveq	#4, d1
+;		bsr.w	PCM_LoadSampleToChip
 
 		bra.w	ReturnToMain
 		
