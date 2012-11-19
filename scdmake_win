@@ -279,7 +279,7 @@ if ( $joliet ) {
 
 # PVD date format
 # TODO get date in perl...
-chomp(my $date = (`date -u +%Y%m%d%H%M%S00`)[0]);
+my $date = "2012111502034800";
 
 # extent entry date format
 if ( $date !~ m/^([0-9]{4})([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})00$/ ) {
@@ -316,7 +316,7 @@ if ( $ipassemble ) {
 sub Touch {
     foreach my $file (@_) {
 	# TODO platform specific command
-	system("touch $file");
+	system("type nul > $file");
     }
 }
 
