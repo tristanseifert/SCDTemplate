@@ -45,6 +45,7 @@ PCM_InitialiseDriver:
 		bset	#7, d1											; Make sure sounding is enabled.
 		bset	#6, d1											; Enable "MOD" bit.
 		move.b	d1, $F(a1)										; Set the control register to allow register modifications.
+		bsr.s	PCM_WaitForRF5C164								; Wait for PCM chip.
 
 		move.b	d2, $D(a1)										; Write channel ST data to PCM chip
 		bsr.s	PCM_WaitForRF5C164								; Wait for PCM chip.
@@ -59,6 +60,7 @@ PCM_InitialiseDriver:
 		move.b	#$FF, $3(a1)									; Centred pan.
 		bsr.s	PCM_WaitForRF5C164								; Wait for PCM chip.
 		move.b	#$D0, $1(a1)									; Set envelope data.
+		bsr.s	PCM_WaitForRF5C164								; Wait for PCM chip.
 
 		add.b	#$20, d2										; Add to the ST data for the next channel.
 		dbf		d7, @initChannel								; Keep looping.
@@ -151,26 +153,35 @@ PCM_LoadSong:
 ; Loads a new sample to the chip (d0 is channel (1-8), d1 is the ID of the sample)
 ;
 ; Breaks: 	a0, a1, a2 
-; 			d0, d1, d2
+; 			d0, d1, d2, d3
 ;			(Backed up and restored)
 ;---------------------------------------------------------------------------------------------------
 PCM_LoadSampleToChip:
-		movem.l	d0-d2/a0-a2, -(sp)								; Back up the registers we mangle.
+		movem.l	d0-d3/a0-a2, -(sp)								; Back up the registers we mangle.
 
-		lea		SampleStorageArea, a0							; Sample bank storage
+		moveq	#0, d3											; Clear d3
+		moveq	#0, d2											; Clear d2
+
 		lea		$FF0000, a1										; PCM chip to a1 
 		lea		$2001(a1), a2									; PCM wave RAM ($FF2001)
 		
 		move.b	#$FF, $11(a1)									; Disable sounding for all channels.
+		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
+				
+		lea		SampleStorageArea, a0							; Sample bank storage
+		lsl.w	#3, d1											; Multiply d1 by 8 to get sample offset into the table.
+		add.l	d1, a0											; Add to pointer.
 		
-		lsl.w	#3, d1											; Multiply d0 by 8 to get sample offset into the table.
-		add.l	(a0, d1.w), a0									; Add offset of the sample — a0 is sample location.
-		move.l	4(a0, d1.w), d2									; Get the size of the sample.
+		move.l	(a0), d3										; Read first long of the sample's heasder (offset)
+		move.l	4(a0), d2										; Read second long of the sample's header (size)
+		and.l	#$1FFF, d2										; Make sure length is < 8k
 		
-		; d1 and d2 can be abused at this point, d3 holds sample size
+		lea		SampleStorageArea, a0							; Sample bank storage area
+		add.l	d3, a0											; Add offset to a0
+		
+		; d1 can be abused at this point, d2 holds sample size
 		subq.b	#1, d0											; Subtract one for the proper bit numbers
 		bclr	d0, DriverStateArea								; Disable current channel
-		move.b	DriverStateArea, $11(a1)						; Write enabled channels
 			
 		; Configure the PCM chip to access the selected channel's registers.
 		moveq	#0, d1											; Clear d2.
@@ -179,16 +190,19 @@ PCM_LoadSampleToChip:
 		bset	#6, d1											; Enable "MOD" bit.
 		move.b	d1, $F(a1)										; Set the control register to allow register modifications.
 		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
+		
 		move.b	#$03, $7(a1)									; Set FDH to $03
 		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
 		move.b	#$EF, $5(a1)									; Set FDL to $EF
+		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
 		
 		; Set up the PCM chip with the right bank for the channel.
 		moveq	#0, d1											; Clear d2 — MOD is disabled, we select 4k bank.
 		move.b	d0, d1											; Get the channel.
-		add.b	d2, d1											; Multiply by two.
+		add.b	d1, d1											; Multiply by two.
 		bset	#7, d1											; Make sure sounding is enabled.
 		move.b	d1, $F(a1)										; Update the control register to write to the bank for the channel.
+		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
 		
 		; See if sample is > 4K
 		cmp.w	#$FFF, d2										; Is the size less than 4K?
@@ -209,21 +223,24 @@ PCM_LoadSampleToChip:
 		dbf		d1, @copyFirst4K								; Keep looping.
 		
 		; If it was less than 4K, we're done here.
-		cmp.w	#$FFF, d3										; Is the sample's size less than 4K?
+		cmp.w	#$FFF, d2										; Is the sample's size less than 4K?
 		bls.s	@noMoreCopyNeeded								; If so, we're done here.
 		
 		; Configure the PCM chip to the second 4K bank for the channel.
 		moveq	#0, d1											; Clear d2 — MOD is disabled, we select 4k bank.
 		move.b	d0, d1											; Get the channel.
-		add.b	d2, d1											; Multiply by two.
+		add.b	d1, d1											; Multiply by two.
 		bset	#0, d1											; Second bank for the channel.
 		bset	#7, d1											; Make sure sounding is enabled.
 		move.b	d1, $F(a1)										; Update the control register to write to the bank for the channel.
+		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
 		
 		; Reset pointers and copy.
 		lea		$2001(a1), a2									; Reset a2 to PCM wave RAM.
-		move.w	d2, d1											; Copy the sample length to d2.
+		moveq	#0, d1											; Clear d1
+		move.w	d2, d1											; Copy the sample length to d1.
 		sub.w	#$1000, d1										; Subtract 4K from it.
+		and.w	#$FFF, d1										; Make sure it does not exceed 4k.
 		
 @copyMorePCMData:
 		move.b	(a0)+, (a2)										; Copy a byte of PCM data.
@@ -241,19 +258,19 @@ PCM_LoadSampleToChip:
 		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
 
 		move.b	#$00, $11(a1)									; Enable sounding for all channels.
+		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
 		
 		bset	d0, DriverStateArea								; Enable current channel
-		move.b	DriverStateArea, $11(a1)						; Write enabled channels
 		
-		move.b	#"T", (a2)
-		move.b	#"E", 2(a2)
-		move.b	#"S", 4(a2)
-		move.b	#"T", 6(a2)
-		move.b	#"$", 8(a2)
+		move.b	#$FF, (a2)										; Write end of sample flag.
+		move.b	#$FF, 2(a2)										; Write end of sample flag.
+		move.b	#$FF, 4(a2)										; Write end of sample flag.
+		move.b	#$FF, 6(a2)										; Write end of sample flag.
+		
 		moveq	#4, d1
 		BIOS_LEDSET
 		
-		movem.l	(sp)+, d0-d2/a0-a2								; Restore the registers we mangled.
+		movem.l	(sp)+, d0-d3/a0-a2								; Restore the registers we mangled.
 		rts
 	
 ;---------------------------------------------------------------------------------------------------

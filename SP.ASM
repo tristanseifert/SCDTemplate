@@ -170,14 +170,14 @@ CDDAResume:
 ; Plays a simple drum loop.
 ; The FD value for the samples is all 0x03EF.
 PlayPCM:		
-;		bsr.w	PCM_InitialiseDriver
+		bsr.w	PCM_InitialiseDriver
 
 		moveq	#0, d0								; Song 0
 		bsr.w	PCM_LoadSong
 
-;		moveq	#0, d0
-;		moveq	#4, d1
-;		bsr.w	PCM_LoadSampleToChip
+		moveq	#1, d0											; Channel 1 (1 based)
+		moveq	#3, d1
+		bsr.w	PCM_LoadSampleToChip
 
 		bra.w	ReturnToMain
 		
@@ -266,7 +266,7 @@ DriveInitParam:	dc.w	$01FF
 SPInt:
 		movem.l	d0-a6, -(sp)						; Back up all registers
 
-		bsr.w	DriverMainLoop						; Run PCM driver.
+	;	bsr.w	DriverMainLoop						; Run PCM driver.
 
 		movem.l	(sp)+, d0-a6						; Restore registers.
 		rts
