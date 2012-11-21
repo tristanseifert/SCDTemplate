@@ -176,8 +176,8 @@ PlayPCM:
 		bsr.w	PCM_LoadSong
 
 		moveq	#1, d0											; Channel 1 (1 based)
-		moveq	#3, d1
-		bsr.w	PCM_LoadSampleToChip
+		moveq	#0, d1
+;		bsr.w	PCM_LoadSampleToChip
 
 		bra.w	ReturnToMain
 		
@@ -266,7 +266,7 @@ DriveInitParam:	dc.w	$01FF
 SPInt:
 		movem.l	d0-a6, -(sp)						; Back up all registers
 
-	;	bsr.w	DriverMainLoop						; Run PCM driver.
+		bsr.w	DriverMainLoop						; Run PCM driver.
 
 		movem.l	(sp)+, d0-a6						; Restore registers.
 		rts

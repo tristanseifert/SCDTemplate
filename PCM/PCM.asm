@@ -511,6 +511,7 @@ DriverMainLoop:
 		and.w	#$FF00, d1										; Get only the high part.
 		lsr.w	#8, d1											; Shift it into the low position.
 		move.b	d1, $7(a1)										; Write the high part of the FD.
+		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
 	
 		movem.l	(sp)+, d1-d2/a1									; Restore registers.
 		rts
@@ -523,6 +524,7 @@ DriverMainLoop:
 @proccessFlag:
 		movem.l	d0-d1/a0, -(sp)									; Back up registers.
 
+		moveq	#0, d0											; Clear d0.
 		move.b	(a6)+, d0										; Copy the command.
 		sub.w	#$D0, d0										; Subtract command offset.
 		add.w	d0, d0											; Multiply by 2
@@ -563,15 +565,15 @@ PCM_RegJmp:
 		
 		lea		-3(a6), a6										; Rewind 3 bytes.
 		
-		btst	#15, d0											; Is it a negative displacement?
-		bne.s	@negDisplace									; If so, branch.
+		cmp.w	#$8000, d0										; Is it a negative displacement (bit 15 set)?
+		bhs.s	@negDisplace									; If so, branch.
 
 		add.l	d0, a6											; Add to the offset.
 
 		bra.s	@continue										; Branch over negative displacement code.
 
 @negDisplace:
-		bclr	#15, d0											; Clear sign bit.
+		and.w	#$7FFF, d0										; Clear sign bit. (Faster than bclr)
 		sub.l	d0, a6											; Subtract from the offset.
 
 @continue:
