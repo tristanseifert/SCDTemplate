@@ -140,8 +140,6 @@ PCM_LoadSong:
 		addq.l	#4, a0											; Move over to the next channel.		
 		dbf		d0, @setUpInitialChannelData					; Keep looping until all channels are initialised.
 		
-		move.l	#"REND", DriverStateArea+$50					; Mark the end of the driver state area. (For memory dumps)
-		
 		lea		$FF0000, a1										; PCM chip to a1 
 		move.b	#$FF, $11(a1)									; Enable sounding for all channels.
 		;move.b	#$00, $11(a1)									; Enable sounding for all channels.
@@ -176,7 +174,6 @@ PCM_LoadSampleToChip:
 				
 		lea		SampleStorageArea, a0							; Sample bank storage
 		lsl.w	#3, d1											; Multiply d1 by 8 to get sample offset into the table.
-		;add.l	d1, a0											; Add to pointer.
 		
 		move.l	(a0, d1.w), d3									; Read first long of the sample's heasder (offset)
 		move.l	4(a0, d1.w), d2									; Read second long of the sample's header (size)
@@ -203,7 +200,7 @@ PCM_LoadSampleToChip:
 		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
 		
 		; Set up the PCM chip with the right bank for the channel.
-		moveq	#0, d1											; Clear d2 — MOD is disabled, we select 4k bank.
+		moveq	#0, d1											; Clear d2 — MOD is disabled, we select 4k bank to access.
 		move.b	d0, d1											; Get the channel.
 		add.b	d1, d1											; Multiply by two.
 		bset	#7, d1											; Make sure sounding is enabled.
