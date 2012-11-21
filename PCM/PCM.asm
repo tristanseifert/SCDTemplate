@@ -22,9 +22,10 @@ Level3JumpTableLoc:	EQU	$00005F82
 ; Initialises the PCM driver, configuring it as the interrupt source and setting default
 ; parameters in memory, and initialising PCM registers.
 ;---------------------------------------------------------------------------------------------------
+
 PCM_InitialiseDriver:
-;		move.w	#$4EB9, (Level3JumpTableLoc).w					; Use JSR opcode in jump table
-;		move.l	#DriverMainLoop, (Level3JumpTableLoc+2).w		; Set the timer's main loop as LVL3 int
+;		move.w	#$4EF9, (Level3JumpTableLoc).w					; Use JMP opcode in jump table
+;		move.l	#DriverMainLoop_IntWrap, (Level3JumpTableLoc+2).w; Set the interrupt wrapper for int3
 		
 		bclr	#0, DriverStateArea+$1							; No song is loaded.
 		
@@ -125,6 +126,8 @@ PCM_LoadSong:
 		dbf		d7, @clearStateRAM								; Loop until everything is cleared.
 		
 		move.b	SongStorageArea+$2, ($FFFF8031).w				; Set the interrupt timer value.
+		;move.w	#$00F0, ($FFFF8030).w							; Set timer.
+		bset	#3, ($FFFF8033).w								; Enable level 3 int.
 		
 		moveq	#0, d0											; Clear d0, the loop counter.
 		move.b	SongStorageArea+$1, d0							; Number of channels to use.
@@ -140,8 +143,8 @@ PCM_LoadSong:
 		move.l	#"REND", DriverStateArea+$50					; Mark the end of the driver state area. (For memory dumps)
 		
 		lea		$FF0000, a1										; PCM chip to a1 
-		;move.b	#$FF, $11(a1)									; Enable sounding for all channels.
-		move.b	#$00, $11(a1)									; Enable sounding for all channels.
+		move.b	#$FF, $11(a1)									; Enable sounding for all channels.
+		;move.b	#$00, $11(a1)									; Enable sounding for all channels.
 		
 		move.b	#1, DriverStateArea+$1							; We just loaded a song.
 		
@@ -161,26 +164,28 @@ PCM_LoadSampleToChip:
 
 		moveq	#0, d3											; Clear d3
 		moveq	#0, d2											; Clear d2
+		subq.b	#1, d0											; Subtract one for the proper bit numbers for channels
 
 		lea		$FF0000, a1										; PCM chip to a1 
 		lea		$2001(a1), a2									; PCM wave RAM ($FF2001)
 		
-		move.b	#$FF, $11(a1)									; Disable sounding for all channels.
+		moveq	#0, d3											; Clear d3.
+		bset	d0, d3											; Set the right bit.
+		move.b	d3, $11(a1)										; Disable sounding for the channel we're updating.
 		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
 				
 		lea		SampleStorageArea, a0							; Sample bank storage
 		lsl.w	#3, d1											; Multiply d1 by 8 to get sample offset into the table.
-		add.l	d1, a0											; Add to pointer.
+		;add.l	d1, a0											; Add to pointer.
 		
-		move.l	(a0), d3										; Read first long of the sample's heasder (offset)
-		move.l	4(a0), d2										; Read second long of the sample's header (size)
+		move.l	(a0, d1.w), d3									; Read first long of the sample's heasder (offset)
+		move.l	4(a0, d1.w), d2									; Read second long of the sample's header (size)
 		and.l	#$1FFF, d2										; Make sure length is < 8k
 		
 		lea		SampleStorageArea, a0							; Sample bank storage area
 		add.l	d3, a0											; Add offset to a0
 		
 		; d1 can be abused at this point, d2 holds sample size
-		subq.b	#1, d0											; Subtract one for the proper bit numbers
 		bclr	d0, DriverStateArea								; Disable current channel
 			
 		; Configure the PCM chip to access the selected channel's registers.
@@ -191,9 +196,10 @@ PCM_LoadSampleToChip:
 		move.b	d1, $F(a1)										; Set the control register to allow register modifications.
 		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
 		
-		move.b	#$03, $7(a1)									; Set FDH to $03
+		; Make sure this channel won't play.
+		move.b	#$00, $7(a1)									; Set FDH to $00
 		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
-		move.b	#$EF, $5(a1)									; Set FDL to $EF
+		move.b	#$00, $5(a1)									; Set FDL to $00
 		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
 		
 		; Set up the PCM chip with the right bank for the channel.
@@ -429,6 +435,23 @@ PCM_ReadCD_ExtraJunk:
 		even
 
 ;---------------------------------------------------------------------------------------------------
+; DriverMainLoop_IntWrap
+;
+; A routine that can be set as an interrupt vector (for example, the level 3 timer interrupt) that
+; backs up the registers and calls the driver.
+;
+; Destroys: Nothing (All is backed up to the stack.)
+;---------------------------------------------------------------------------------------------------
+
+DriverMainLoop_IntWrap:
+		movem.l	d0-a6, -(sp)									; Back up all registers
+		
+		bsr.s	DriverMainLoop									; Jump to sound driver.
+		
+		movem.l	(sp)+, d0-a6									; Restore registers.
+		rte														; We're jumped to straight from the vector table, so rte.
+
+;---------------------------------------------------------------------------------------------------
 ; DriverMainLoop
 ;
 ; The driver's main loop, called every timer interrupt.
@@ -497,8 +520,7 @@ DriverMainLoop:
 		moveq	#0, d1											; Clear d2.
 		move.b	d2, d1											; Get the channel.
 		bset	#7, d1											; Make sure sounding is enabled.
-		bset	#6, d1											; Enable "MOD" bit.
-		
+		bset	#6, d1											; Enable "MOD" bit.	
 		move.b	d1, $F(a1)										; Set the control register to allow register modifications.
 		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
 	
@@ -511,7 +533,6 @@ DriverMainLoop:
 		and.w	#$FF00, d1										; Get only the high part.
 		lsr.w	#8, d1											; Shift it into the low position.
 		move.b	d1, $7(a1)										; Write the high part of the FD.
-		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
 	
 		movem.l	(sp)+, d1-d2/a1									; Restore registers.
 		rts
