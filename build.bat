@@ -11,4 +11,3 @@ REM Assemble modules (add more assembler commands below)
 bin\asm68k /o op+ /o os+ /o ow+ /o oz+ /o oaq+ /o osq+ /o omq+ /p /o ae- menu/menu.asm, MENU.BIN, , menu/menu.lst
 
 perl scdmake_win
-pause
