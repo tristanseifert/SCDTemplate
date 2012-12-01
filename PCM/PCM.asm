@@ -134,15 +134,17 @@ PCM_LoadSong:
 
 		lea		SongStorageArea+$4, a0							; Track pointer thingies
 		lea		DriverStateArea+$2, a1							; PCM1 track offset.
+		lea		DriverStateArea+$20, a4							; Each channel has 8 bytes starting at $20.
 
 @setUpInitialChannelData:
 		move.w	(a0), (a1)+										; Get the initial track location to the state area.
-		addq.l	#4, a0											; Move over to the next channel.		
+		move.b	3(a0), 1(a4)									; Get initial note displacement.
+		addq.l	#4, a0											; Move over to the next channel.	
+		addq.l	#8, a4											; Next channel's area.
 		dbf		d0, @setUpInitialChannelData					; Keep looping until all channels are initialised.
 		
 		lea		$FF0000, a1										; PCM chip to a1 
-		move.b	#$FF, $11(a1)									; Enable sounding for all channels.
-		;move.b	#$00, $11(a1)									; Enable sounding for all channels.
+		move.b	#$FF, $11(a1)									; Disable sounding for all channels.
 		
 		move.b	#1, DriverStateArea+$1							; We just loaded a song.
 		
@@ -482,6 +484,7 @@ DriverMainLoop:
 		
 		moveq	#0, d0											; Clear d0.
 		move.b	(a6)+, d0										; Get note to d0.
+		add.b	1(a4), d0										; Add note displacement.
 		add.w	d0, d0											; Multiply by two.
 		lea		PCM_NoteFDEquivs(pc), a0		 				; Get note table address to a0
 		move.w	(a0, d0.w), d0									; Get the right note value to d0
@@ -597,10 +600,60 @@ PCM_RegJmp:
 @continue:
 		rts
 		
+		
 PCM_ChangePan:
-PCM_SetNoteDisp:
-PCM_Loop:
+		movem.l	d1-d2/a1, -(sp)									; Back up registers.
+		lea		$FF0000, a1										; PCM chip to a1 
+	
+		moveq	#7, d2											; 8 channels
+		sub.b	d7, d2											; Subtract loop counter from it.
+			
+		; Configure the PCM chip to access the selected channel's registers.
+		moveq	#0, d1											; Clear d2.
+		move.b	d2, d1											; Get the channel.
+		bset	#7, d1											; Make sure sounding is enabled.
+		bset	#6, d1											; Enable "MOD" bit.	
+		move.b	d1, $F(a1)										; Set the control register to allow register modifications.
+		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
+	
+		move.b	(a6)+, $3(a1)									; Write the pan value.
+		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
+	
+		movem.l	(sp)+, d1-d2/a1									; Restore registers.
+
+		rts
+	
+; Actually writes to the envelope register, so it's not exactly true to it's name, but it
+; does do the same thing essentially, so no one really gives a shit. I hope.
+	
 PCM_SetVolume:
+		movem.l	d1-d2/a1, -(sp)									; Back up registers.
+		lea		$FF0000, a1										; PCM chip to a1 
+	
+		moveq	#7, d2											; 8 channels
+		sub.b	d7, d2											; Subtract loop counter from it.
+			
+		; Configure the PCM chip to access the selected channel's registers.
+		moveq	#0, d1											; Clear d2.
+		move.b	d2, d1											; Get the channel.
+		bset	#7, d1											; Make sure sounding is enabled.
+		bset	#6, d1											; Enable "MOD" bit.	
+		move.b	d1, $F(a1)										; Set the control register to allow register modifications.
+		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
+	
+		move.b	(a6)+, $1(a1)									; Write the envelope value.
+		bsr.w	PCM_WaitForRF5C164								; Wait for PCM chip.
+	
+		movem.l	(sp)+, d1-d2/a1									; Restore registers.
+
+		rts
+
+; Sets the note displacement byte after the command to the RAM; takes effect next note.
+PCM_SetNoteDisp:
+		move.b	(a6)+, 1(a4)									; Set note displacement to RAM.
+		rts
+
+PCM_Loop:
 PCM_CondJmp:
 		rts
 		
