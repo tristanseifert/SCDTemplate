@@ -9,3 +9,4 @@ common/loadermodule.bin
 *.iso
 *.gsx
 */.DS_Store
+*.ISO

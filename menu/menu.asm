@@ -247,6 +247,8 @@ Joypad_Read:
 		move.b	d1,(a0)+
 		rts
 		
+		
+		
 ClearFG:
 		move.l	#$40000003, d5
         bra.s	DoClear

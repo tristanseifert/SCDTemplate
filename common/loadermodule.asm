@@ -5,7 +5,6 @@ EntryPoint:
 		lea		VBlank(pc), a1						; Load Address for VBL routine
 		jsr     $368								; Make appropriate change in Interrupt Jump table
 
-
 ;		move.w	#$8144, $C00004						; Turn off VINTs
 		ori.b	#2, $A12003							; Give SUB CPU control of WordRAM
 		
@@ -15,9 +14,6 @@ EntryPoint:
 		moveq	#$7F, d0							; Loop 8 times = 40 nops
 	
 @loop:
-		nop
-		nop
-		nop
 		nop
 		nop
 		nop
@@ -57,7 +53,7 @@ EntryPoint:
 		dbf		d1, @copyToMainRAM					; Loop until it's all copied.
 		
 		move.l	$FF0000, a6							; Start of RAM to a6
-		; Not really needed since d0 isn't modified from th ecalculations above -- save some CPU cycles.
+		; Not really needed since d0 isn't modified from the calculations above -- save some CPU cycles.
 		;moveq	#0, d0								; Clear d0
 		;move.w	6(a0), d0							; Get our RAM offset to d0
 		;bclr	#0, d0								; Clear LSB to even it out. (14 cycles)
@@ -75,7 +71,10 @@ EntryPoint:
 		jmp		$200008								; Jump to program.
 	
 FileInvalid:
-		bra.w	FileInvalid							; INFINITE LOOP!1!!!!!!
+		move.l 	#$C0000000, $C00004					; First line, 0th colour
+		move.w 	#$000E, $C00000 					; Set BG palette to red
+
+		bra.w	*									; INFINITE LOOP!1!!!!!!
 		
 VBlank:
 		rte

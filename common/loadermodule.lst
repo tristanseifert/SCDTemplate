@@ -20,62 +20,62 @@
 00FF0226 4E71                       		nop
 00FF0228 4E71                       		nop
 00FF022A 4E71                       		nop
-00FF022C 4E71                       		nop
-00FF022E 4E71                       		nop
+00FF022C 51C8 FFF4                  		dbf		d0, @loop							; Keep looping.
+00FF0230                            		
+00FF0230                            @waitForSubCPU3:
 00FF0230 4E71                       		nop
-00FF0232 51C8 FFEE                  		dbf		d0, @loop							; Keep looping.
-00FF0236                            		
-00FF0236                            @waitForSubCPU3:
-00FF0236 4E71                       		nop
-00FF0238 0C39 0044 00A1 200F        		cmp.b	#'D', $A1200F						; Wait for Sub CPU to service our command
-00FF0240 66F4                       		bne.s	@waitForSubCPU3						; Keep looping until it finishes
-00FF0242                            		
-00FF0242 13FC 0000 00A1 200E        		move.b	#0, $A1200E							; Clear program.
-00FF024A 33FC 0000 00A1 2010        		move.w	#0, $A12010							; Clear parameter.
+00FF0232 0C39 0044 00A1 200F        		cmp.b	#'D', $A1200F						; Wait for Sub CPU to service our command
+00FF023A 66F4                       		bne.s	@waitForSubCPU3						; Keep looping until it finishes
+00FF023C                            		
+00FF023C 13FC 0000 00A1 200E        		move.b	#0, $A1200E							; Clear program.
+00FF0244 33FC 0000 00A1 2010        		move.w	#0, $A12010							; Clear parameter.
+00FF024C                            		
+00FF024C 41F9 0020 0000             		lea		$200000, a0							; Load Word RAM address to a0.
 00FF0252                            		
-00FF0252 41F9 0020 0000             		lea		$200000, a0							; Load Word RAM address to a0.
-00FF0258                            		
-00FF0258 0C90 4D41 494E             		cmp.l	#"MAIN", (a0)						; Is the loaded file a Main CPU executable?
-00FF025E 6600                       		bne.s	FileInvalid							; If not, panic and go to infinite loop land.
-00FF0260                            		
-00FF0260 0C68 0000 0006             		cmp.w	#0, 6(a0)							; Check if we've got a RAM offset
-00FF0266 6700 0000                  		beq.w	@runFromWordRAM						; If not, branch.
-00FF026A                            		
-00FF026A 7000                       		moveq	#0, d0								; Clear d0.
-00FF026C 7200                       		moveq	#0, d1								; Clear d1.
-00FF026E 2C7A FD90                  		move.l	$FF0000, a6							; Start of RAM to a6
-00FF0272 3028 0006                  		move.w	6(a0), d0							; Get our RAM offset to d0
-00FF0276                            		;bclr	#0, d0								; Clear LSB to even it out.
-00FF0276 0240 FFFE                  		and.w	#$FFFE, d0							; Make sure it's even. (Faster than bclr)
-00FF027A DDC0                       		add.l	d0, a6								; Add to the pointer.
-00FF027C 4BF9 0020 000A             		lea		$20000A, a5							; Word RAM offset to a5.
-00FF0282 3228 0008                  		move.w	8(a0), d1							; Get the length to copy.
-00FF0286 5341                       		subq.w	#1, d1								; Subtract 1 to offset loop
-00FF0288                            
-00FF0288                            @copyToMainRAM:
-00FF0288 1CDD                       		move.b	(a5)+, (a6)+						; Copy one byte of the data.
-00FF028A 51C9 FFFC                  		dbf		d1, @copyToMainRAM					; Loop until it's all copied.
+00FF0252 0C90 4D41 494E             		cmp.l	#"MAIN", (a0)						; Is the loaded file a Main CPU executable?
+00FF0258 6600                       		bne.s	FileInvalid							; If not, panic and go to infinite loop land.
+00FF025A                            		
+00FF025A 0C68 0000 0006             		cmp.w	#0, 6(a0)							; Check if we've got a RAM offset
+00FF0260 6700 0000                  		beq.w	@runFromWordRAM						; If not, branch.
+00FF0264                            		
+00FF0264 7000                       		moveq	#0, d0								; Clear d0.
+00FF0266 7200                       		moveq	#0, d1								; Clear d1.
+00FF0268 2C7A FD96                  		move.l	$FF0000, a6							; Start of RAM to a6
+00FF026C 3028 0006                  		move.w	6(a0), d0							; Get our RAM offset to d0
+00FF0270                            		;bclr	#0, d0								; Clear LSB to even it out.
+00FF0270 0240 FFFE                  		and.w	#$FFFE, d0							; Make sure it's even. (Faster than bclr)
+00FF0274 DDC0                       		add.l	d0, a6								; Add to the pointer.
+00FF0276 4BF9 0020 000A             		lea		$20000A, a5							; Word RAM offset to a5.
+00FF027C 3228 0008                  		move.w	8(a0), d1							; Get the length to copy.
+00FF0280 5341                       		subq.w	#1, d1								; Subtract 1 to offset loop
+00FF0282                            
+00FF0282                            @copyToMainRAM:
+00FF0282 1CDD                       		move.b	(a5)+, (a6)+						; Copy one byte of the data.
+00FF0284 51C9 FFFC                  		dbf		d1, @copyToMainRAM					; Loop until it's all copied.
+00FF0288                            		
+00FF0288 2C7A FD76                  		move.l	$FF0000, a6							; Start of RAM to a6
+00FF028C                            		; Not really needed since d0 isn't modified from the calculations above -- save some CPU cycles.
+00FF028C                            		;moveq	#0, d0								; Clear d0
+00FF028C                            		;move.w	6(a0), d0							; Get our RAM offset to d0
+00FF028C                            		;bclr	#0, d0								; Clear LSB to even it out. (14 cycles)
+00FF028C                            		;and.w	#$FFFE, d0							; Make sure it's even. (Faster than bclr)
+00FF028C DDC0                       		add.l	d0, a6								; Add to the pointer.
 00FF028E                            		
-00FF028E 2C7A FD70                  		move.l	$FF0000, a6							; Start of RAM to a6
-00FF0292                            		; Not really needed since d0 isn't modified from th ecalculations above -- save some CPU cycles.
-00FF0292                            		;moveq	#0, d0								; Clear d0
-00FF0292                            		;move.w	6(a0), d0							; Get our RAM offset to d0
-00FF0292                            		;bclr	#0, d0								; Clear LSB to even it out. (14 cycles)
-00FF0292                            		;and.w	#$FFFE, d0							; Make sure it's even. (Faster than bclr)
-00FF0292 DDC0                       		add.l	d0, a6								; Add to the pointer.
-00FF0294                            		
-00FF0294 4ED6                       		jmp		(a6)								; Jump to the code.
-00FF0296                            
-00FF0296                            @runFromWordRAM:
-00FF0296 4DF9 0020 0000             		lea		$200000, a6							; Load Word RAM address to a0.
-00FF029C                            		;moveq	#0, d0								; Clear d0.
-00FF029C                            		;move.w	4(a6), d0							; Copy offset of entry point to d0.
-00FF029C DCEE 0004                  		add.w	4(a6), a6							; Add to pointer.
-00FF02A0                            
-00FF02A0 4EF9 0020 0008             		jmp		$200008								; Jump to program.
-00FF02A6                            	
-00FF02A6                            FileInvalid:
-00FF02A6 6000 FFFE                  		bra.w	FileInvalid							; INFINITE LOOP!1!!!!!!
-00FF02AA                            		
-00FF02AA                            VBlank:
-00FF02AA 4E73                       		rte
+00FF028E 4ED6                       		jmp		(a6)								; Jump to the code.
+00FF0290                            
+00FF0290                            @runFromWordRAM:
+00FF0290 4DF9 0020 0000             		lea		$200000, a6							; Load Word RAM address to a0.
+00FF0296                            		;moveq	#0, d0								; Clear d0.
+00FF0296                            		;move.w	4(a6), d0							; Copy offset of entry point to d0.
+00FF0296 DCEE 0004                  		add.w	4(a6), a6							; Add to pointer.
+00FF029A                            
+00FF029A 4EF9 0020 0008             		jmp		$200008								; Jump to program.
+00FF02A0                            	
+00FF02A0                            FileInvalid:
+00FF02A0 23FC C000 0000 00C0 0004   		move.l 	#$C0000000, $C00004					; First line, 0th colour
+00FF02AA 33FC 000E 00C0 0000        		move.w 	#$000E, $C00000 					; Set BG palette to red
+00FF02B2                            
+00FF02B2 6000 FFFE                  		bra.w	*									; INFINITE LOOP!1!!!!!!
+00FF02B6                            		
+00FF02B6                            VBlank:
+00FF02B6 4E73                       		rte
