@@ -81,37 +81,27 @@ MainLoop:
 ;		cmp.b	#5, d0								; Are we executing 'PlayPCM?'
 ;		beq.w	PlayPCM								; If so, branch.
 
-		cmp.w 	#(SubRoutineTableEnd-SubRoutineTable/2), d0 	; Is our value out of bounds?
+		cmp.w 	#(SubRoutineTableEnd-SubRoutineTable/4), d0 	; Is our value out of bounds?
 		bgt.w 	ReturnToMain 									; If so, branch.
 
 ;		moveq 	#4, d1
 ;		BIOS_LEDSET
 ;		bra 	*
 
-		subq.w 	#1, d0 											; Our array is 0-based
+		subq.w 	#1, d0 											; Our array is 0-based.
 
-		add.w 	d0, d0 											; Multiply routine by itself.
-		move.w	SubRoutineTable(pc, d0.w), d1					; Get offset of routine.
-		jmp		SubRoutineTable(pc, d1.w)						; Jump relative to table start
-		
-;		lsl.w	#2, d0											; Multiply by 4
-;		movea.l	SubRoutineTable(pc, d0.w), a0					; Acquire address of screen mode into a0
-;		jmp 	(a0)											; Jump into routine
+		lsl.w	#2, d0											; Multiply by 4
+		movea.l	SubRoutineTable(pc, d0.w), a0					; Acquire address of screen mode into a0
+		jmp 	(a0)											; Jump into routine
 
 		bra.s	MainLoop										; Keep looping.
 
 SubRoutineTable:
-		dc.w 	LoadProgram-SubRoutineTable
-		dc.w 	PlayCDDAR-SubRoutineTable
-		dc.w 	CDDAPause-SubRoutineTable
-		dc.w 	CDDAResume-SubRoutineTable
-		dc.w 	PlayPCM-SubRoutineTable
-
-;		dc.l 	LoadProgram
-;		dc.l 	PlayCDDAR
-;		dc.l 	CDDAPause
-;		dc.l 	CDDAResume
-;		dc.l 	PlayPCM
+		dc.l 	LoadProgram
+		dc.l 	PlayCDDAR
+		dc.l 	CDDAPause
+		dc.l 	CDDAResume
+		dc.l 	PlayPCM
 SubRoutineTableEnd:
 		even
 
